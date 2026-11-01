@@ -8,6 +8,6 @@ window.NODE_WEB_CONFIG = {
     uuid: "99999999-9999-8999-9999-99abcdefabcd",
     host: "lin.kyma.dpdns.org",
     sni: "lin.kyma.dpdns.org",
-    path: "/?ed=2048"
+    path: "/knny96214?ed=2048"
   }
 };
