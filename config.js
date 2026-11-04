@@ -25,7 +25,7 @@ window.NODE_WEB_CONFIG = {
     uuid: "99999999-9999-8999-9999-99abcdefabcd",
     host: "lin.kyma.dpdns.org",
     sni: "lin.kyma.dpdns.org",
-    path: "/knny96214?ed=2048",
+    path: "/?ed=2048",
 
     // ---- 高级参数 ----
     fp: "chrome", // 浏览器指纹：chrome / firefox / safari / ios / android / edge
