@@ -4,13 +4,20 @@
   "use strict";
 
   // ========== [核心配置] ==========
-  // 数据库文件路径
-  const DATABASE_PATHS = [
-    "./database.json", // 当前目录
-    "/database.json", // 根目录
-    "../database.json", // 上级目录
-    "data/database.json", // data子目录
-  ];
+  // 数据库文件路径：由 config.js 的 geolocation.databasePaths 统一配置
+  const NODE_WEB_CONFIG =
+    (typeof window !== "undefined" && window.NODE_WEB_CONFIG) || {};
+  const GEOLOCATION_CONFIG = NODE_WEB_CONFIG.geolocation || {};
+  const DATABASE_PATHS =
+    Array.isArray(GEOLOCATION_CONFIG.databasePaths) &&
+    GEOLOCATION_CONFIG.databasePaths.length > 0
+      ? GEOLOCATION_CONFIG.databasePaths
+      : [
+          "./database.json", // 当前目录
+          "/database.json", // 根目录
+          "../database.json", // 上级目录
+          "data/database.json", // data子目录
+        ];
 
   // ========== [关键：这里插入你的自定义方法] ==========
   // 这是主要的回调点，当数据库加载失败或查询结果为ZZ时调用

@@ -17,38 +17,26 @@
         const themeStylesheet = document.getElementById(
           "darkThemeStylesheet",
         );
-        const supportedThemes = [
-          "light",
-          "dark",
-          "style3",
-          "style4",
-          "style5",
-          "style6",
-        ];
-        const configuredThemes = [
-          null,
-          "light",
-          "dark",
-          "style3",
-          "style4",
-          "style5",
-          "style6",
-        ];
-        const configuredDefaultTheme =
-          window.NODE_WEB_CONFIG &&
-          configuredThemes[window.NODE_WEB_CONFIG.defaultTheme];
+        const appConfig = window.NODE_WEB_CONFIG || {};
+        const themeConfig = appConfig.theme || {};
+        const themes = Array.isArray(themeConfig.list) ? themeConfig.list : [];
+        const supportedThemes = themes.map((item) => item.id);
+        // theme.default 使用 1 起始的序号，对应 theme.list 中的顺序
+        const configuredDefaultTheme = themes[Number(themeConfig.default) - 1];
         let theme = "style3";
 
         if (configuredDefaultTheme) {
-          theme = configuredDefaultTheme;
+          theme = configuredDefaultTheme.id;
         } else {
           console.warn(
-            "默认主题配置无效，请在 config.js 中将 defaultTheme 设置为 1 到 6",
+            "默认主题配置无效，请在 config.js 的 theme.default 中设置 1 到 6",
           );
         }
 
         try {
-          const savedTheme = localStorage.getItem("vless-node-theme-v2");
+          const savedTheme = localStorage.getItem(
+            themeConfig.storageKey || "vless-node-theme-v2",
+          );
           if (supportedThemes.includes(savedTheme)) {
             theme = savedTheme;
           }
@@ -56,14 +44,15 @@
           console.warn("读取主题偏好失败", error);
         }
 
+        const activeTheme = themes.find((item) => item.id === theme);
         document.documentElement.dataset.theme = theme;
         document.documentElement.classList.toggle(
           "show-merged-upload-buttons",
-          window.NODE_WEB_CONFIG &&
-            window.NODE_WEB_CONFIG.showMergedSubscriptionUploadButtons ===
-              true,
+          Boolean(
+            appConfig.ui && appConfig.ui.showMergedSubscriptionUploadButtons,
+          ),
         );
-        themeStylesheet.disabled = theme !== "dark" && theme !== "style4";
+        themeStylesheet.disabled = !(activeTheme && activeTheme.dark);
       })();
     </script>
   </head>
@@ -135,12 +124,7 @@
         >
           <span>👁️</span> 显示/隐藏标题
         </button>
-        <button
-          class="quick-btn"
-          onclick="
-            window.location.href = 'https://manager.knny.dpdns.org'
-          "
-        >
+        <button class="quick-btn" onclick="openNodeRepository()">
           <span>🏢</span> 节点仓库
         </button>
       </div>
@@ -267,7 +251,7 @@
                         <span class="help-inline">A列=1，B列=2</span></label
                       >
                       <div class="input-row">
-                        <input type="number" id="ipColumn" value="1" min="1" />
+                        <input type="number" id="ipColumn" min="1" />
                       </div>
                     </div>
                     <div class="csv-form-group">
@@ -279,7 +263,6 @@
                         <input
                           type="number"
                           id="portColumn"
-                          value="-1"
                           min="-1"
                         />
                       </div>
@@ -293,7 +276,6 @@
                         <input
                           type="number"
                           id="cityColumn"
-                          value="-1"
                           min="-1"
                         />
                       </div>
@@ -310,7 +292,6 @@
                         <input
                           type="number"
                           id="countryColumn"
-                          value="-1"
                           min="-1"
                         />
                       </div>
@@ -324,7 +305,6 @@
                         <input
                           type="number"
                           id="regionColumn"
-                          value="-1"
                           min="-1"
                         />
                       </div>
@@ -338,7 +318,6 @@
                         <input
                           type="number"
                           id="speedColumn"
-                          value="-1"
                           min="-1"
                         />
                       </div>
@@ -437,7 +416,6 @@
                     <input
                       type="number"
                       id="defaultPort"
-                      value="443"
                       min="1"
                       max="65535"
                     />
@@ -445,7 +423,7 @@
 
                   <div class="form-group">
                     <label for="remarksPrefix">别名前缀</label>
-                    <input type="text" id="remarksPrefix" value="自选" />
+                    <input type="text" id="remarksPrefix" />
                   </div>
                 </div>
 
@@ -457,21 +435,21 @@
                 </div>
 
                 <div class="checkbox-group">
-                  <input type="checkbox" id="autoLocation" checked />
+                  <input type="checkbox" id="autoLocation" />
                   <label for="autoLocation"
                     ><strong>自动识别IP属地生成别名</strong></label
                   >
                 </div>
 
                 <div class="checkbox-group">
-                  <input type="checkbox" id="renameOnMerge" checked />
+                  <input type="checkbox" id="renameOnMerge" />
                   <label for="renameOnMerge"
                     ><strong>合并时重新设置所有节点别名</strong></label
                   >
                 </div>
                 <!-- 新增：使用CSV信息生成别名 -->
                 <div class="checkbox-group">
-                  <input type="checkbox" id="useCsvInfo" checked />
+                  <input type="checkbox" id="useCsvInfo" />
                   <label for="useCsvInfo"
                     ><strong>优先使用CSV信息生成别名</strong></label
                   >
@@ -507,70 +485,30 @@
                   <div class="form-group">
                     <label>用户ID (UUID)</label>
                     <div class="config-choice">
-                      <input
-                        type="text"
-                        id="uuid"
-                        value="99999999-9999-8999-9999-99abcdefabcd"
-                      />
+                      <input type="text" id="uuid" />
                       <select
+                        id="uuidPreset"
                         aria-label="选择UUID候选值"
                         onchange="
                           document.getElementById('uuid').value = this.value;
                           this.selectedIndex = 0;
                         "
-                      >
-                        <option value="" selected></option>
-                        <option value="471a8e64-7b21-4703-b1d1-45a221098459">
-                          471a8e64-7b21-4703-b1d1-45a221098459
-                        </option>
-                        <option value="98765432-10fe-dcba-9876-543210fedcba">
-                          98765432-10fe-dcba-9876-543210fedcba
-                        </option>
-                        <option value="99999999-9999-8999-9999-99abcdefabcd">
-                          99999999-9999-8999-9999-99abcdefabcd
-                        </option>
-                        <option value="88888888-8888-8888-9888-88abcdefabcd">
-                          88888888-8888-8888-9888-88abcdefabcd
-                        </option>
-                      </select>
+                      ></select>
                     </div>
                   </div>
 
                   <div class="form-group">
                     <label>伪装域名 (Host)</label>
                     <div class="config-choice">
-                      <input
-                        type="text"
-                        id="host"
-                        value="s.kyma.dpdns.org"
-                      />
+                      <input type="text" id="host" />
                       <select
+                        id="hostPreset"
                         aria-label="选择Host候选值"
                         onchange="
                           syncHostAndSni('host', this.value);
                           this.selectedIndex = 0;
                         "
-                      >
-                        <option value="" selected></option>
-                        <option value="s.kyma.dpdns.org">
-                          s.kyma.dpdns.org
-                        </option>
-                        <option value="node.knny.dpdns.org">
-                          node.knny.dpdns.org
-                        </option>
-                        <option value="node.soren920.dpdns.org">
-                          node.soren920.dpdns.org
-                        </option>
-                        <option value="onlycore.knny.dpdns.org">
-                          onlycore.knny.dpdns.org
-                        </option>
-                        <option value="onlycore.soren920.dpdns.org">
-                          onlycore.soren920.dpdns.org
-                        </option>
-                        <option value="el.kyma.dpdns.org">
-                          el.kyma.dpdns.org
-                        </option>
-                      </select>
+                      ></select>
                     </div>
                     </div>
                   </div>
@@ -579,56 +517,30 @@
                   <div class="form-group">
                     <label>SNI域名</label>
                     <div class="config-choice">
-                      <input type="text" id="sni" value="s.kyma.dpdns.org" />
+                      <input type="text" id="sni" />
                       <select
+                        id="sniPreset"
                         aria-label="选择SNI候选值"
                         onchange="
                           syncHostAndSni('sni', this.value);
                           this.selectedIndex = 0;
                         "
-                      >
-                        <option value="" selected></option>
-                        <option value="s.kyma.dpdns.org">
-                          s.kyma.dpdns.org
-                        </option>
-                        <option value="node.knny.dpdns.org">
-                          node.knny.dpdns.org
-                        </option>
-                        <option value="node.soren920.dpdns.org">
-                          node.soren920.dpdns.org
-                        </option>
-                        <option value="onlycore.knny.dpdns.org">
-                          onlycore.knny.dpdns.org
-                        </option>
-                        <option value="onlycore.soren920.dpdns.org">
-                          onlycore.soren920.dpdns.org
-                        </option>
-                        <option value="el.kyma.dpdns.org">
-                          el.kyma.dpdns.org
-                        </option>
-                      </select>
+                      ></select>
                     </div>
                   </div>
 
                   <div class="form-group">
                     <label>浏览器指纹 (fp)</label>
                     <div class="config-choice">
-                      <input type="text" id="fp" value="chrome" />
+                      <input type="text" id="fp" />
                       <select
+                        id="fpPreset"
                         aria-label="选择浏览器指纹"
                         onchange="
                           document.getElementById('fp').value = this.value;
                           this.selectedIndex = 0;
                         "
-                      >
-                        <option value="" selected></option>
-                        <option value="chrome">chrome</option>
-                        <option value="firefox">firefox</option>
-                        <option value="safari">safari</option>
-                        <option value="ios">ios</option>
-                        <option value="android">android</option>
-                        <option value="edge">edge</option>
-                      </select>
+                      ></select>
                     </div>
                   </div>
                 </div>
@@ -638,35 +550,23 @@
                     <label
                       >自定义Path参数
                       <span class="help-inline"
-                        >默认: /knny96214?ed=2048</span
+                        >默认值见 config.js 的 defaultVlessConfig.path</span
                       ></label
                     >
                     <div class="config-choice">
                       <input
                         type="text"
                         id="customPath"
-                        value="/knny96214?ed=2048"
                         placeholder="例如: /knny96214?ed=2048"
                       />
                       <select
+                        id="pathPreset"
                         aria-label="选择自定义Path参数"
                         onchange="
                           document.getElementById('customPath').value = this.value;
                           this.selectedIndex = 0;
                         "
-                      >
-                        <option value="" selected></option>
-                        <option value="/?ed=2048">/?ed=2048</option>
-                        <option value="/knny96214?ed=2048">
-                          /knny96214?ed=2048
-                        </option>
-                        <option value="/?ed=2048&auth=knny96214">
-                          /?ed=2048&auth=knny96214
-                        </option>
-                        <option value="/">
-                          /
-                        </option>
-                      </select>
+                      ></select>
                     </div>
                   </div>
 
@@ -677,21 +577,15 @@
                         >仅更新原链接已有的ech参数</span
                       ></label
                     >
-                    <input
-                      type="text"
-                      id="ech"
-                      value="cloudflare-ech.com+https://223.5.5.5/dns-query"
-                    />
+                    <input type="text" id="ech" />
                   </div>
                 </div>
 
                 <div class="help-text">
-                  其他固定参数：<br />
-                  • 加密方式：none<br />
-                  • 网络类型：ws<br />
-                  • TLS：启用<br />
-                  • ECH：仅原始Vless链接包含ech参数时启用，默认值为
-                  cloudflare-ech.com+https://223.5.5.5/dns-query<br />
+                  其他固定参数（加密方式、网络类型、TLS、insecure 等）由
+                  config.js 的 defaultVlessConfig 配置。<br />
+                  • ECH：仅原始Vless链接包含 ech 参数时启用，默认值见
+                  defaultVlessConfig.ech<br />
                   • Flow：空<br />
                   • 伪装方式：空
                 </div>
@@ -944,7 +838,7 @@
                       style="flex: 1"
                     />
                     <label class="token-save-label" for="saveToken">
-                      <input type="checkbox" id="saveToken" checked />
+                      <input type="checkbox" id="saveToken" />
                       保存令牌到本地存储
                     </label>
                   </div>
@@ -953,14 +847,7 @@
                 <div class="path-select-row">
                   <div class="form-group">
                     <label for="downloadUrlSelect">下载远程订阅路径：</label>
-                    <select id="downloadUrlSelect">
-                      <option value="Main">Main（主要订阅）</option>
-                      <option value="Optimal" selected>
-                        Optimal（优选订阅）
-                      </option>
-                      <option value="Plain">Plain（明文订阅）</option>
-                      <option value="custom">自定义路径</option>
-                    </select>
+                    <select id="downloadUrlSelect"></select>
                     <input
                       type="text"
                       id="customDownloadUrl"
@@ -972,14 +859,7 @@
 
                   <div class="form-group">
                     <label for="uploadPathSelect">订阅待上传路径：</label>
-                    <select id="uploadPathSelect">
-                      <option value="Optimal">
-                        Optimal（优选订阅）
-                      </option>
-                      <option value="Main">Main（主要订阅）</option>
-                      <option value="Plain">Plain（明文订阅）</option>
-                      <option value="custom">自定义路径</option>
-                    </select>
+                    <select id="uploadPathSelect"></select>
                     <input
                       type="text"
                       id="customUploadPath"
@@ -996,37 +876,29 @@
                 <div class="config-row">
                   <div class="form-group">
                     <label for="githubRepo">GitHub仓库：</label>
-                    <input
-                      type="text"
-                      id="githubRepo"
-                      value="DaiZhouHui/CustomNode"
-                    />
+                    <input type="text" id="githubRepo" />
                   </div>
 
                   <div class="form-group">
                     <label for="githubBranch">分支：</label>
-                    <input type="text" id="githubBranch" value="main" />
+                    <input type="text" id="githubBranch" />
                   </div>
                 </div>
 
                 <div class="config-row">
                   <div class="form-group">
                     <label for="optimalNodeFile">优选订阅文件</label>
-                    <input
-                      type="text"
-                      id="optimalNodeFile"
-                      value="Optimal"
-                    />
+                    <input type="text" id="optimalNodeFile" />
                   </div>
 
                   <div class="form-group">
                     <label for="mainNodeFile">主要订阅文件</label>
-                    <input type="text" id="mainNodeFile" value="Main" />
+                    <input type="text" id="mainNodeFile" />
                   </div>
 
                   <div class="form-group">
                     <label for="plainNodeFile">明文订阅文件</label>
-                    <input type="text" id="plainNodeFile" value="Plain" />
+                    <input type="text" id="plainNodeFile" />
                   </div>
                 </div>
 
@@ -1048,8 +920,9 @@
                       </button>
                     </div>
                     <div class="help-text">
-                      将删除 GitHub 仓库中对应的文件及同名的 .yaml
+                      将删除 GitHub 仓库中对应的文件及同名的 YAML
                       文件，请谨慎操作。<a
+                        id="customNodeRepoLink"
                         href="https://github.com/DaiZhouHui/CustomNode"
                         target="_blank"
                         >访问CustomNode仓库</a
@@ -1068,7 +941,7 @@
                   <div class="form-group">
                     <label for="fileLinkTypeSelect">生成链接类型</label>
                     <select id="fileLinkTypeSelect">
-                      <option value="worker" selected>
+                      <option value="worker">
                         Worker 订阅链接（默认，仅限配置仓库）
                       </option>
                       <option value="raw">
@@ -1080,7 +953,7 @@
                     </select>
                     <div class="help-text">
                       默认使用 Cloudflare Worker 生成订阅链接（仅限 config.js 中
-                      workerRepo 指定的仓库）；仓库不匹配或 Worker
+                      github.worker.repo 指定的仓库）；仓库不匹配或 Worker
                       请求失败时自动回退 GitHub Raw。也可直接选择 GitHub
                       Raw/Pages 使用原有方式。
                     </div>
@@ -1152,8 +1025,8 @@
             >
               <h3>🔗 订阅链接</h3>
               <div class="help-text" style="margin-bottom: 12px">
-                订阅文件链接默认由 Cloudflare Worker 生成（仅限配置的
-                CustomNode 仓库）；切换到其他仓库、YAML
+                订阅文件链接默认由 Cloudflare Worker 生成（仅限 Worker
+                配置的仓库）；切换到其他仓库、YAML
                 配置或 Worker 不可用时使用 GitHub 链接。
               </div>
               <div class="github-links-container">
@@ -1549,13 +1422,12 @@
               </div>
               <div class="form-group">
                 <label for="yamlFileName"
-                  >YAML文件名（可选，默认为 clash-config.yaml）</label
+                  >YAML文件名（可选，默认值见 config.js 的 clash.fileName）</label
                 >
                 <input
                   type="text"
                   id="yamlFileName"
                   placeholder="clash-config.yaml"
-                  value="clash-config.yaml"
                 />
               </div>
               <div class="button-group">
@@ -1608,6 +1480,141 @@
         return btoa(binString);
       }
 
+      // ==================== 配置读取辅助 ====================
+      // 所有默认值均来自 config.js；以下兜底仅用于配置缺项时避免页面报错。
+      function getWebConfig() {
+        return window.NODE_WEB_CONFIG &&
+          typeof window.NODE_WEB_CONFIG === "object"
+          ? window.NODE_WEB_CONFIG
+          : {};
+      }
+
+      function getVlessDefaults() {
+        return getWebConfig().defaultVlessConfig || {};
+      }
+
+      function getGithubConfig() {
+        return getWebConfig().github || {};
+      }
+
+      function getGithubFiles() {
+        const files = getGithubConfig().files || {};
+        return {
+          optimal: files.optimal || "Optimal",
+          main: files.main || "Main",
+          plain: files.plain || "Plain",
+          yamlExtension: files.yamlExtension || ".yaml",
+        };
+      }
+
+      function getGithubFileName(key) {
+        const files = getGithubFiles();
+        return files[key] || "";
+      }
+
+      function getYamlExtension() {
+        return getGithubFiles().yamlExtension || ".yaml";
+      }
+
+      function toYamlFileName(fileName) {
+        return String(fileName).replace(/\.[^/.]+$/, "") + getYamlExtension();
+      }
+
+      function getGithubRepo() {
+        const input = document.getElementById("githubRepo");
+        const value = input ? input.value.trim() : "";
+        return value || getGithubConfig().repo || "";
+      }
+
+      function getGithubBranch() {
+        const input = document.getElementById("githubBranch");
+        const value = input ? input.value.trim() : "";
+        return value || getGithubConfig().branch || "main";
+      }
+
+      function getGithubToken() {
+        const input = document.getElementById("githubToken");
+        return input ? input.value.trim() : "";
+      }
+
+      function getGithubTokenStorageKey() {
+        return getGithubConfig().tokenStorageKey || "github_token";
+      }
+
+      function getGithubApiBaseUrl() {
+        const api = getGithubConfig().api || {};
+        const base = typeof api.baseUrl === "string" ? api.baseUrl.trim() : "";
+        return (base || "https://api.github.com").replace(/\/+$/, "");
+      }
+
+      function getGithubApiAccept() {
+        const api = getGithubConfig().api || {};
+        return api.accept || "application/vnd.github.v3+json";
+      }
+
+      function getGithubRetryConfig() {
+        return Object.assign(
+          {
+            maxRetries: 2,
+            shaRateLimitDelay: 2000,
+            shaErrorDelay: 1000,
+            uploadShaMismatchDelay: 1000,
+            uploadRateLimitDelay: 3000,
+            uploadErrorDelay: 2000,
+          },
+          getGithubConfig().retry || {},
+        );
+      }
+
+      function getGithubWorkerConfig() {
+        return getGithubConfig().worker || {};
+      }
+
+      function getGithubFileInputValue(inputId, fileKey) {
+        const input = document.getElementById(inputId);
+        const value = input ? input.value.trim() : "";
+        return value || getGithubFileName(fileKey);
+      }
+
+      function resolveSelectedPathTarget(selectId, customInputId) {
+        const select = document.getElementById(selectId);
+        const selectedKey = select ? select.value : "";
+        if (selectedKey === "custom") {
+          const customInput = document.getElementById(customInputId);
+          return {
+            key: "custom",
+            file: customInput ? customInput.value.trim() : "",
+          };
+        }
+        return { key: selectedKey, file: getGithubFileName(selectedKey) };
+      }
+
+      function buildGithubTemplateUrl(template, values) {
+        return String(template).replace(/\{(\w+)\}/g, (match, key) =>
+          Object.prototype.hasOwnProperty.call(values, key)
+            ? values[key]
+            : match,
+        );
+      }
+
+      function getClashConfig() {
+        return getWebConfig().clash || {};
+      }
+
+      function getClashFileName() {
+        return getClashConfig().fileName || "clash-config.yaml";
+      }
+
+      function getQrConfig() {
+        return getWebConfig().qr || {};
+      }
+
+      function buildQrServiceUrl(template, size, targetUrl) {
+        return String(template)
+          .replace(/\{size\}/g, String(size))
+          .replace(/\{data\}/g, encodeURIComponent(targetUrl));
+      }
+
       // 全局数据
       let data = {
         vlessLinks: [],
@@ -1652,18 +1659,19 @@
       // 新增：日志数据
       let logData = {
         entries: [],
-        maxEntries: 50,
+        maxEntries: (getWebConfig().logs || {}).maxEntries || 50,
       };
 
       // 新增：通知数据
       let notifications = {
         active: [],
-        maxNotifications: 5,
+        maxNotifications:
+          (getWebConfig().notifications || {}).maxNotifications || 5,
       };
 
       // 新增：缓存时间戳
       let lastDownloadTimestamp = 0;
-      const DOWNLOAD_CACHE_TIME = 2000; // 2秒缓存时间
+      const DOWNLOAD_CACHE_TIME = getGithubConfig().downloadCacheTime || 2000;
 
       // 新增：确认对话框键盘事件处理器
       let dialogKeyHandler = null;
@@ -1679,27 +1687,9 @@
         initHeaderToggle();
         initThemeToggle();
 
-        // 初始化默认配置值（从config.js读取）
+        // 初始化页面默认配置值（全部来自 config.js）
         try {
-          if (window.NODE_WEB_CONFIG && window.NODE_WEB_CONFIG.defaultVlessConfig) {
-            const config = window.NODE_WEB_CONFIG.defaultVlessConfig;
-            if (config.uuid) {
-              const uuidInput = document.getElementById("uuid");
-              if (uuidInput) uuidInput.value = config.uuid;
-            }
-            if (config.host) {
-              const hostInput = document.getElementById("host");
-              if (hostInput) hostInput.value = config.host;
-            }
-            if (config.sni) {
-              const sniInput = document.getElementById("sni");
-              if (sniInput) sniInput.value = config.sni;
-            }
-            if (config.path) {
-              const pathInput = document.getElementById("customPath");
-              if (pathInput) pathInput.value = config.path;
-            }
-          }
+          applyConfigDefaults();
         } catch (e) {
           console.warn("加载默认配置失败:", e);
         }
@@ -1724,25 +1714,154 @@
         initUploadPathSelect();
 
         // 自动隐藏标题提示
-        setTimeout(() => {
-          const headerInfo = document.getElementById("headerInfo");
-          if (headerInfo && !headerInfo.classList.contains("hidden")) {
-            headerInfo.classList.add("hidden");
-          }
-        }, 3000);
+        const autoHideHeaderDelay =
+          Number((getWebConfig().ui || {}).autoHideHeaderDelay) || 0;
+        if (autoHideHeaderDelay > 0) {
+          setTimeout(() => {
+            const headerInfo = document.getElementById("headerInfo");
+            if (headerInfo && !headerInfo.classList.contains("hidden")) {
+              headerInfo.classList.add("hidden");
+            }
+          }, autoHideHeaderDelay);
+        }
       });
+
+      // 将 config.js 中的默认值写入页面控件
+      function applyConfigDefaults() {
+        const setValue = (id, value) => {
+          if (value === undefined || value === null || value === "") return;
+          const element = document.getElementById(id);
+          if (element) element.value = value;
+        };
+        const setChecked = (id, checked) => {
+          if (typeof checked !== "boolean") return;
+          const element = document.getElementById(id);
+          if (element) element.checked = checked;
+        };
+
+        // ---- Vless 默认配置 ----
+        const vless = getVlessDefaults();
+        setValue("uuid", vless.uuid);
+        setValue("host", vless.host);
+        setValue("sni", vless.sni);
+        setValue("customPath", vless.path);
+        setValue("fp", vless.fp);
+        setValue("ech", vless.ech);
+        setValue("defaultPort", vless.port);
+        setValue("remarksPrefix", vless.prefix);
+        setChecked("forcePort443", vless.forcePort443);
+        setChecked("autoLocation", vless.autoLocation);
+        setChecked("renameOnMerge", vless.renameOnMerge);
+        setChecked("useCsvInfo", vless.useCsvInfo);
+
+        const presets = getWebConfig().vlessPresets || {};
+        fillPresetSelect("uuidPreset", presets.uuid);
+        fillPresetSelect("hostPreset", presets.host);
+        fillPresetSelect("sniPreset", presets.sni);
+        fillPresetSelect("fpPreset", presets.fp);
+        fillPresetSelect("pathPreset", presets.path);
+
+        // ---- CSV 列默认值 ----
+        const columns = (getWebConfig().csv || {}).defaultColumns || {};
+        setValue("ipColumn", columns.ip);
+        setValue("portColumn", columns.port);
+        setValue("cityColumn", columns.city);
+        setValue("countryColumn", columns.country);
+        setValue("regionColumn", columns.region);
+        setValue("speedColumn", columns.speed);
+
+        // ---- GitHub 同步默认配置 ----
+        const github = getGithubConfig();
+        setValue("githubRepo", github.repo);
+        setValue("githubBranch", github.branch);
+        setChecked("saveToken", github.saveToken);
+        setValue("optimalNodeFile", getGithubFileName("optimal"));
+        setValue("mainNodeFile", getGithubFileName("main"));
+        setValue("plainNodeFile", getGithubFileName("plain"));
+        populatePathSelect(
+          "downloadUrlSelect",
+          github.defaultDownloadPath,
+          ["main", "optimal", "plain"],
+        );
+        populatePathSelect(
+          "uploadPathSelect",
+          github.defaultUploadPath,
+          ["optimal", "main", "plain"],
+        );
+
+        const linkTypeSelect = document.getElementById("fileLinkTypeSelect");
+        if (linkTypeSelect) {
+          linkTypeSelect.value = ["worker", "raw", "pages"].includes(
+            github.defaultLinkType,
+          )
+            ? github.defaultLinkType
+            : "worker";
+        }
+
+        const repoLink = document.getElementById("customNodeRepoLink");
+        if (repoLink && github.repo) {
+          repoLink.href = `https://github.com/${github.repo}`;
+          repoLink.textContent = `访问 ${github.repo} 仓库`;
+        }
+
+        // ---- Clash YAML 默认文件名 ----
+        setValue("yamlFileName", getClashFileName());
+      }
+
+      function fillPresetSelect(selectId, values) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        select.innerHTML = "";
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "";
+        select.appendChild(placeholder);
+        (Array.isArray(values) ? values : []).forEach((value) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = value;
+          select.appendChild(option);
+        });
+        select.selectedIndex = 0;
+      }
+
+      function populatePathSelect(selectId, defaultKey, order) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        const labels = {
+          main: "主要订阅",
+          optimal: "优选订阅",
+          plain: "明文订阅",
+        };
+        select.innerHTML = "";
+        order.forEach((key) => {
+          const option = document.createElement("option");
+          option.value = key;
+          option.textContent = `${labels[key]}（${getGithubFileName(key)}）`;
+          select.appendChild(option);
+        });
+        const customOption = document.createElement("option");
+        customOption.value = "custom";
+        customOption.textContent = "自定义路径";
+        select.appendChild(customOption);
+        const allowed = order.concat("custom");
+        const normalizedDefault = String(defaultKey || "").toLowerCase();
+        const matchedKey = allowed.find(
+          (key) =>
+            key === normalizedDefault ||
+            (key !== "custom" &&
+              getGithubFileName(key).toLowerCase() === normalizedDefault),
+        );
+        select.value = matchedKey || order[0];
+      }
 
       // 定时同步功能已移除
 
       // Cloudflare Worker 订阅管理服务：上传订阅文件后获取受保护的订阅链接
-      const DEFAULT_WORKER_BASE_URL = "https://manager.knny.dpdns.org";
-      const DEFAULT_WORKER_REPO = "DaiZhouHui/CustomNode";
-      const WORKER_SUBSCRIPTION_TIMEOUT = 15000;
       let workerLinkWarningShown = false;
 
       function getWorkerBaseUrl() {
-        const config = window.NODE_WEB_CONFIG || {};
-        const configuredUrl = config.workerBaseUrl;
+        const configuredUrl = getGithubWorkerConfig().baseUrl;
         if (configuredUrl === false || configuredUrl === null) {
           return "";
         }
@@ -1750,22 +1869,31 @@
           // 显式留空表示禁用 Worker
           return configuredUrl.trim().replace(/\/+$/, "");
         }
-        // 旧版 config.js 未配置该项时使用默认地址
-        return DEFAULT_WORKER_BASE_URL.replace(/\/+$/, "");
+        return "";
+      }
+
+      function openNodeRepository() {
+        const url = getWorkerBaseUrl();
+        if (!url) {
+          showNotification("节点仓库", "尚未配置 Worker 服务地址", "warning");
+          return;
+        }
+        window.location.href = url;
       }
 
       function isSubscriptionFile(fileName) {
         // YAML 是配置文件而不是订阅文件，继续使用 GitHub 链接
-        return !/\.ya?ml$/i.test(fileName);
+        const lowerName = String(fileName).toLowerCase();
+        const yamlExtension = getYamlExtension().toLowerCase();
+        return !(
+          (yamlExtension && lowerName.endsWith(yamlExtension)) ||
+          /\.ya?ml$/i.test(lowerName)
+        );
       }
 
       function getWorkerRepo() {
-        const config = window.NODE_WEB_CONFIG || {};
-        const configuredRepo =
-          typeof config.workerRepo === "string"
-            ? config.workerRepo.trim()
-            : "";
-        return configuredRepo || DEFAULT_WORKER_REPO;
+        const configuredRepo = getGithubWorkerConfig().repo;
+        return typeof configuredRepo === "string" ? configuredRepo.trim() : "";
       }
 
       function isWorkerManagedRepo(repo) {
@@ -1785,16 +1913,31 @@
 
       function buildGithubLink(repo, branch, fileName, linkType) {
         // 选择 worker 时，GitHub 链接作为回退，默认使用 Raw
+        const githubConfig = getGithubConfig();
         const githubType = linkType === "pages" ? "pages" : "raw";
         if (githubType === "pages") {
           const parts = repo.split("/");
           if (parts.length >= 2) {
-            const user = parts[0].toLowerCase();
-            const repoName = parts[1];
-            return `https://${user}.github.io/${repoName}/${fileName}`;
+            return buildGithubTemplateUrl(
+              githubConfig.pagesUrlTemplate ||
+                "https://{user}.github.io/{repo}/{file}",
+              {
+                user: parts[0].toLowerCase(),
+                repo: parts[1],
+                file: fileName,
+              },
+            );
           }
         }
-        return `https://raw.githubusercontent.com/${repo}/${branch}/${fileName}`;
+        return buildGithubTemplateUrl(
+          githubConfig.rawUrlTemplate ||
+            "https://raw.githubusercontent.com/{repo}/{branch}/{file}",
+          {
+            repo: repo,
+            branch: branch,
+            file: fileName,
+          },
+        );
       }
 
       async function fetchWorkerSubscriptionLink(fileName, token) {
@@ -1806,15 +1949,20 @@
           throw new Error("缺少GitHub Token，无法向 Worker 验证身份");
         }
 
+        const workerConfig = getGithubWorkerConfig();
+        const timeout =
+          Number(workerConfig.timeout) > 0 ? Number(workerConfig.timeout) : 15000;
+        const apiPath =
+          typeof workerConfig.subscriptionApiPath === "string" &&
+          workerConfig.subscriptionApiPath.trim()
+            ? workerConfig.subscriptionApiPath.trim()
+            : "/api/subscription-link";
         const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          WORKER_SUBSCRIPTION_TIMEOUT,
-        );
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
         try {
           const response = await fetch(
-            `${workerBaseUrl}/api/subscription-link`,
+            `${workerBaseUrl}${apiPath.startsWith("/") ? apiPath : `/${apiPath}`}`,
             {
               method: "POST",
               headers: {
@@ -1928,38 +2076,40 @@
         customMessage = "",
         useWorkerSubscriptionLink = true,
       ) {
-        const token = document.getElementById("githubToken").value.trim();
+        const token = getGithubToken();
         if (!token) {
           throw new Error("缺少GitHub Token，请先在GitHub配置中输入有效的令牌");
         }
 
-        const repo = document.getElementById("githubRepo").value.trim();
+        const repo = getGithubRepo();
         if (!repo) {
           throw new Error("GitHub仓库名称不能为空");
         }
 
-        const branch =
-          document.getElementById("githubBranch").value.trim() || "main";
+        const branch = getGithubBranch();
 
         // 记录原始操作
         const originalFileName = fileName;
         const isRetry = customMessage.includes("[重试]");
+        const retryConfig = getGithubRetryConfig();
+        const apiBaseUrl = getGithubApiBaseUrl();
+        const apiAccept = getGithubApiAccept();
 
         // 步骤1: 尝试获取最新的SHA值
         let fileSha = null;
         let retryCount = 0;
-        const maxRetries = 2;
+        const maxRetries = retryConfig.maxRetries;
 
         while (retryCount <= maxRetries) {
           try {
             // 清除可能的缓存，使用时间戳
             const timestamp = Date.now();
-            const checkUrl = `https://api.github.com/repos/${repo}/contents/${fileName}?ref=${branch}&t=${timestamp}`;
+            const checkUrl = `${apiBaseUrl}/repos/${repo}/contents/${fileName}?ref=${branch}&t=${timestamp}`;
 
             const checkRes = await fetch(checkUrl, {
               headers: {
                 Authorization: `token ${token}`,
-                Accept: "application/vnd.github.v3+json",
+                Accept: apiAccept,
               },
             });
 
@@ -1987,7 +2137,7 @@
                 retryCount < maxRetries
               ) {
                 retryCount++;
-                const waitTime = 2000 * retryCount;
+                const waitTime = retryConfig.shaRateLimitDelay * retryCount;
                 console.log(`⏳ 等待 ${waitTime}ms 后重试...`);
                 await new Promise((resolve) => setTimeout(resolve, waitTime));
                 continue;
@@ -2002,7 +2152,7 @@
             console.error(`❌ 获取 ${fileName} SHA 时出错:`, e);
             if (retryCount < maxRetries) {
               retryCount++;
-              const waitTime = 1000 * retryCount;
+              const waitTime = retryConfig.shaErrorDelay * retryCount;
               console.log(`⏳ 等待 ${waitTime}ms 后重试...`);
               await new Promise((resolve) => setTimeout(resolve, waitTime));
               continue;
@@ -2035,12 +2185,12 @@
         while (retryCount <= maxRetries) {
           try {
             const res = await fetch(
-              `https://api.github.com/repos/${repo}/contents/${fileName}`,
+              `${apiBaseUrl}/repos/${repo}/contents/${fileName}`,
               {
                 method: "PUT",
                 headers: {
                   Authorization: `token ${token}`,
-                  Accept: "application/vnd.github.v3+json",
+                  Accept: apiAccept,
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify(body),
@@ -2100,12 +2250,12 @@
 
                 // 强制重新获取SHA（跳过缓存）
                 const timestamp = Date.now();
-                const retryCheckUrl = `https://api.github.com/repos/${repo}/contents/${fileName}?ref=${branch}&t=${timestamp}&force=true`;
+                const retryCheckUrl = `${apiBaseUrl}/repos/${repo}/contents/${fileName}?ref=${branch}&t=${timestamp}&force=true`;
 
                 const retryCheckRes = await fetch(retryCheckUrl, {
                   headers: {
                     Authorization: `token ${token}`,
-                    Accept: "application/vnd.github.v3+json",
+                    Accept: apiAccept,
                   },
                 });
 
@@ -2125,7 +2275,8 @@
                 body.message = `[重试]${message}`;
 
                 retryCount++;
-                const waitTime = 1000 * retryCount;
+                const waitTime =
+                  retryConfig.uploadShaMismatchDelay * retryCount;
                 console.log(`⏳ 等待 ${waitTime}ms 后重试上传...`);
                 await new Promise((resolve) => setTimeout(resolve, waitTime));
                 continue;
@@ -2135,7 +2286,7 @@
               ) {
                 // GitHub API限制，等待后重试
                 retryCount++;
-                const waitTime = 3000 * retryCount;
+                const waitTime = retryConfig.uploadRateLimitDelay * retryCount;
                 console.log(`⏳ GitHub API限制，等待 ${waitTime}ms 后重试...`);
                 await new Promise((resolve) => setTimeout(resolve, waitTime));
                 continue;
@@ -2149,7 +2300,7 @@
             console.error(`❌ ${fileName} 上传异常:`, e);
             if (retryCount < maxRetries) {
               retryCount++;
-              const waitTime = 2000 * retryCount;
+              const waitTime = retryConfig.uploadErrorDelay * retryCount;
               console.log(`⏳ 等待 ${waitTime}ms 后重试上传...`);
               await new Promise((resolve) => setTimeout(resolve, waitTime));
               continue;
@@ -2268,10 +2419,11 @@
 
         // 删除远程文件（及其 .yaml）功能实现
         async function deleteSingleGithubFile(filePath) {
-          const token = document.getElementById("githubToken").value.trim();
-          const repo = document.getElementById("githubRepo").value.trim();
-          const branch =
-            document.getElementById("githubBranch").value.trim() || "main";
+          const token = getGithubToken();
+          const repo = getGithubRepo();
+          const branch = getGithubBranch();
+          const apiBaseUrl = getGithubApiBaseUrl();
+          const apiAccept = getGithubApiAccept();
           if (!token)
             throw new Error(
               "缺少GitHub Token，请先在GitHub配置中输入有效的令牌",
@@ -2281,11 +2433,11 @@
 
           // 先获取文件信息以获取 sha
           const metaRes = await fetch(
-            `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(filePath)}?ref=${branch}`,
+            `${apiBaseUrl}/repos/${repo}/contents/${encodeURIComponent(filePath)}?ref=${branch}`,
             {
               headers: {
                 Authorization: `token ${token}`,
-                Accept: "application/vnd.github.v3+json",
+                Accept: apiAccept,
               },
             },
           );
@@ -2300,12 +2452,12 @@
           const sha = meta.sha;
 
           const delRes = await fetch(
-            `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(filePath)}`,
+            `${apiBaseUrl}/repos/${repo}/contents/${encodeURIComponent(filePath)}`,
             {
               method: "DELETE",
               headers: {
                 Authorization: `token ${token}`,
-                Accept: "application/vnd.github.v3+json",
+                Accept: apiAccept,
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
@@ -2325,8 +2477,8 @@
         async function deleteGithubFiles(baseName) {
           if (!baseName) throw new Error("请输入要删除的文件名");
           const results = [];
-          // 要删除的目标：baseName 以及 baseName.yaml
-          const candidates = [baseName, `${baseName}.yaml`];
+          // 要删除的目标：baseName 以及对应的 YAML 文件
+          const candidates = [baseName, toYamlFileName(baseName)];
           for (const f of candidates) {
             try {
               const r = await deleteSingleGithubFile(f);
@@ -2381,7 +2533,7 @@
             }
             showConfirmDialog(
               "确认删除",
-              `确定删除远程文件 ${base} 及 ${base}.yaml 吗？此操作不可恢复。`,
+              `确定删除远程文件 ${base} 及 ${toYamlFileName(base)} 吗？此操作不可恢复。`,
               async () => {
                 try {
                   showLoading(true, "deleteRemoteFileBtn");
@@ -2529,14 +2681,16 @@
 
         // 修复：粘贴CSV内容生成节点的功能
         let csvTimer;
+        const csvAutoGenerateDelay =
+          Number((getWebConfig().ui || {}).csvAutoGenerateDelay) || 0;
         document.getElementById("csvInput").addEventListener("input", () => {
           clearTimeout(csvTimer);
-          // 当用户停止输入1秒后自动生成
+          // 当用户停止输入后自动生成（延迟由 config.js 配置）
           csvTimer = setTimeout(() => {
             if (data.currentSource !== "file") {
               generateVless();
             }
-          }, 1000);
+          }, csvAutoGenerateDelay);
         });
 
         document
@@ -2628,9 +2782,10 @@
             return;
           }
 
-          const plainNodeFile = document
-            .getElementById("plainNodeFile")
-            .value.trim();
+          const plainNodeFile = getGithubFileInputValue(
+            "plainNodeFile",
+            "plain",
+          );
           const plainText = data.uniqueNodes.join("\n");
 
           // 使用通用上传函数
@@ -2660,8 +2815,7 @@
 
           // 同时上传对应的YAML配置文件
           try {
-            const yamlFileName =
-              plainNodeFile.replace(/\.[^/.]+$/, "") + ".yaml";
+            const yamlFileName = toYamlFileName(plainNodeFile);
             const yamlContent = data.mergedYamlContent;
 
             const yamlResult = await uploadToGitHub(
@@ -2798,14 +2952,12 @@
         const toggleBtn = document.getElementById("themeToggleBtn");
         const toggleIcon = document.getElementById("themeToggleIcon");
         const toggleLabel = document.getElementById("themeToggleLabel");
-        const themes = [
-          { id: "light", name: "经典浅色", icon: "☀️", dark: false },
-          { id: "dark", name: "经典暗夜", icon: "🌙", dark: true },
-          { id: "style3", name: "澄光浅色", icon: "🌿", dark: false },
-          { id: "style4", name: "澄光暗夜", icon: "🌌", dark: true },
-          { id: "style5", name: "莓紫轻羽", icon: "🌸", dark: false },
-          { id: "style6", name: "莓紫夜幕", icon: "🌑", dark: true },
-        ];
+        const themeConfig = getWebConfig().theme || {};
+        const themes = Array.isArray(themeConfig.list)
+          ? themeConfig.list
+          : [];
+        if (!themes.length) return;
+
         let activeThemeIndex = Math.max(
           0,
           themes.findIndex((theme) => theme.id === root.dataset.theme),
@@ -2834,11 +2986,14 @@
           activeThemeIndex = (activeThemeIndex + 1) % themes.length;
           const theme = themes[activeThemeIndex];
           root.dataset.theme = theme.id;
-          stylesheet.disabled = theme.id !== "dark" && theme.id !== "style4";
+          stylesheet.disabled = !theme.dark;
           updateThemeControl();
 
           try {
-            localStorage.setItem("vless-node-theme-v2", theme.id);
+            localStorage.setItem(
+              themeConfig.storageKey || "vless-node-theme-v2",
+              theme.id,
+            );
           } catch (error) {
             console.warn("保存主题偏好失败", error);
           }
@@ -2847,8 +3002,17 @@
 
       function initMobileThemeButtonDrag(toggleBtn) {
         const quickActions = toggleBtn.parentElement;
-        const dragPositionKey = "vless-node-theme-button-position-v1";
-        const mobileViewport = window.matchMedia("(max-width: 768px)");
+        const themeConfig = getWebConfig().theme || {};
+        const dragPositionKey =
+          themeConfig.dragPositionStorageKey ||
+          "vless-node-theme-button-position-v1";
+        const mobileBreakpoint =
+          Number(themeConfig.mobileBreakpoint) > 0
+            ? Number(themeConfig.mobileBreakpoint)
+            : 768;
+        const mobileViewport = window.matchMedia(
+          `(max-width: ${mobileBreakpoint}px)`,
+        );
         let dragStart = null;
         let dragged = false;
 
@@ -4126,20 +4290,36 @@
           return fallback;
         };
 
+        const vlessDefaults = getVlessDefaults();
         return {
           uuid:
             document.getElementById("uuid").value.trim() ||
-            "99999999-9999-8999-9999-99abcdefabcd",
-          host: document.getElementById("host").value || "s.kyma.dpdns.org",
-          sni: document.getElementById("sni").value || "s.kyma.dpdns.org",
-          customPath: document.getElementById("customPath").value.trim(),
-          ech: document.getElementById("ech").value.trim(),
-          fp: document.getElementById("fp").value.trim() || "chrome",
+            vlessDefaults.uuid ||
+            "",
+          host:
+            document.getElementById("host").value || vlessDefaults.host || "",
+          sni: document.getElementById("sni").value || vlessDefaults.sni || "",
+          customPath:
+            document.getElementById("customPath").value.trim() ||
+            vlessDefaults.path ||
+            "",
+          ech:
+            document.getElementById("ech").value.trim() ||
+            vlessDefaults.ech ||
+            "",
+          fp:
+            document.getElementById("fp").value.trim() ||
+            vlessDefaults.fp ||
+            "chrome",
           force443: document.getElementById("forcePort443").checked,
           defaultPort:
-            parseInt(document.getElementById("defaultPort").value) || 443,
+            parseInt(document.getElementById("defaultPort").value) ||
+            vlessDefaults.port ||
+            443,
           prefix:
-            document.getElementById("remarksPrefix").value.trim() || "自选",
+            document.getElementById("remarksPrefix").value.trim() ||
+            vlessDefaults.prefix ||
+            "自选",
           autoLoc: document.getElementById("autoLocation").checked,
           useCsvInfo: document.getElementById("useCsvInfo").checked,
           ipColumn: readColumnIndex("ipColumn", 0),
@@ -4898,19 +5078,19 @@
       function generateLink(ip, port, config, remark) {
         // IPv6地址需要用方括号包裹
         const formattedIP = getAddressType(ip) === "ipv6" ? `[${ip}]` : ip;
-        // 读取自定义Path参数，默认为 /knny96214?ed=2048
-        const customPath = document.getElementById("customPath")
-          ? document.getElementById("customPath").value.trim()
-          : "/knny96214?ed=2048";
+        // 读取自定义Path参数，默认值来自 config.js 的 defaultVlessConfig.path
+        const vlessDefaults = getVlessDefaults();
+        const customPath =
+          config.customPath || vlessDefaults.path || "/";
         const encodedPath = encodeURIComponent(customPath);
         const params = [
-          "encryption=none",
-          "security=tls",
+          `encryption=${vlessDefaults.encryption || "none"}`,
+          `security=${vlessDefaults.security || "tls"}`,
           `sni=${encodeURIComponent(config.sni)}`,
           `fp=${config.fp}`,
-          "insecure=0",
-          "allowInsecure=0",
-          "type=ws",
+          `insecure=${vlessDefaults.insecure ? 1 : 0}`,
+          `allowInsecure=${vlessDefaults.allowInsecure ? 1 : 0}`,
+          `type=${vlessDefaults.network || "ws"}`,
           `host=${encodeURIComponent(config.host)}`,
           `path=${encodedPath}`,
         ];
@@ -5270,7 +5450,7 @@
           return;
         }
 
-        const filename = `manual-clash-config-${new Date().toISOString().split("T")[0]}.yaml`;
+        const filename = `manual-clash-config-${new Date().toISOString().split("T")[0]}${getYamlExtension()}`;
         const blob = new Blob([data.manualYamlContent], {
           type: "application/x-yaml",
         });
@@ -5294,7 +5474,7 @@
           return;
         }
 
-        const filename = `merged-clash-config-${new Date().toISOString().split("T")[0]}.yaml`;
+        const filename = `merged-clash-config-${new Date().toISOString().split("T")[0]}${getYamlExtension()}`;
         const blob = new Blob([data.mergedYamlContent], {
           type: "application/x-yaml",
         });
@@ -5318,7 +5498,7 @@
           return;
         }
 
-        const filename = `local-clash-config-${new Date().toISOString().split("T")[0]}.yaml`;
+        const filename = `local-clash-config-${new Date().toISOString().split("T")[0]}${getYamlExtension()}`;
         const blob = new Blob([data.localYamlContent], {
           type: "application/x-yaml",
         });
@@ -5344,7 +5524,7 @@
 
         showLoading(true, "uploadYamlBtn");
         try {
-          const token = document.getElementById("githubToken").value.trim();
+          const token = getGithubToken();
           if (!token) {
             showNotification(
               "上传失败",
@@ -5355,7 +5535,7 @@
             return;
           }
 
-          const repo = document.getElementById("githubRepo").value.trim();
+          const repo = getGithubRepo();
           if (!repo) {
             showNotification(
               "上传失败",
@@ -5366,10 +5546,10 @@
             return;
           }
 
-          // 获取YAML文件名，默认为 clash-config.yaml
+          // 获取YAML文件名，默认值来自 config.js 的 clash.fileName
           const yamlFileName =
             document.getElementById("yamlFileName").value.trim() ||
-            "clash-config.yaml";
+            getClashFileName();
 
           // 使用通用上传函数
           const result = await uploadToGitHub(
@@ -5729,25 +5909,19 @@
               );
               return;
             }
-            const uploadPathSelect =
-              document.getElementById("uploadPathSelect");
-            let uploadPath = uploadPathSelect.value;
-            if (uploadPath === "custom") {
-              const customPath = document
-                .getElementById("customUploadPath")
-                .value.trim();
-              if (!customPath) {
-                showNotification(
-                  "上传失败",
-                  "请输入自定义上传路径，或选择预定义路径",
-                  "error",
-                );
-                return;
-              }
-              targetPath = customPath;
-            } else {
-              targetPath = uploadPath;
+            const uploadSelection = resolveSelectedPathTarget(
+              "uploadPathSelect",
+              "customUploadPath",
+            );
+            if (!uploadSelection.file) {
+              showNotification(
+                "上传失败",
+                "请输入自定义上传路径，或选择预定义路径",
+                "error",
+              );
+              return;
             }
+            targetPath = uploadSelection.file;
             uploadFunc = () => uploadLocalBase64ToPath();
             uploadType = "本地订阅";
             break;
@@ -5762,7 +5936,7 @@
               );
               return;
             }
-            targetPath = document.getElementById("plainNodeFile").value.trim();
+            targetPath = getGithubFileInputValue("plainNodeFile", "plain");
             uploadFunc = () => uploadPlainNodes();
             uploadType = "合并明文订阅";
             break;
@@ -5777,7 +5951,7 @@
               );
               return;
             }
-            targetPath = document.getElementById("mainNodeFile").value.trim();
+            targetPath = getGithubFileInputValue("mainNodeFile", "main");
             uploadFunc = () => uploadMergedBase64();
             uploadType = "合并主要订阅";
             break;
@@ -5792,9 +5966,7 @@
               );
               return;
             }
-            targetPath = document
-              .getElementById("optimalNodeFile")
-              .value.trim();
+            targetPath = getGithubFileInputValue("optimalNodeFile", "optimal");
             uploadFunc = () => uploadMergedOptimal();
             uploadType = "合并优选订阅";
             break;
@@ -5809,24 +5981,19 @@
               );
               return;
             }
-            const pathSelect = document.getElementById("uploadPathSelect");
-            let selectedPath = pathSelect.value;
-            if (selectedPath === "custom") {
-              const customPath = document
-                .getElementById("customUploadPath")
-                .value.trim();
-              if (!customPath) {
-                showNotification(
-                  "上传失败",
-                  "请输入自定义上传路径，或选择预定义路径",
-                  "error",
-                );
-                return;
-              }
-              targetPath = customPath;
-            } else {
-              targetPath = selectedPath;
+            const mergedToPathSelection = resolveSelectedPathTarget(
+              "uploadPathSelect",
+              "customUploadPath",
+            );
+            if (!mergedToPathSelection.file) {
+              showNotification(
+                "上传失败",
+                "请输入自定义上传路径，或选择预定义路径",
+                "error",
+              );
+              return;
             }
+            targetPath = mergedToPathSelection.file;
             uploadFunc = () => uploadMergedToPath();
             uploadType = "合并订阅到指定路径";
             break;
@@ -5852,7 +6019,7 @@
       async function downloadRemote() {
         showLoading(true, "downloadSubBtn");
         try {
-          const token = document.getElementById("githubToken").value.trim();
+          const token = getGithubToken();
           if (!token) {
             showNotification(
               "下载失败",
@@ -5863,7 +6030,7 @@
             return;
           }
 
-          const repo = document.getElementById("githubRepo").value.trim();
+          const repo = getGithubRepo();
           if (!repo) {
             showNotification(
               "下载失败",
@@ -5874,49 +6041,47 @@
             return;
           }
 
-          const branch =
-            document.getElementById("githubBranch").value.trim() || "main";
+          const branch = getGithubBranch();
+          const apiBaseUrl = getGithubApiBaseUrl();
+          const apiAccept = getGithubApiAccept();
 
           // 获取选择的下载路径
-          const urlSelect = document.getElementById("downloadUrlSelect");
-          const selectedOption = urlSelect.value;
-          let targetFile = "";
-
-          if (selectedOption === "custom") {
-            targetFile = document
-              .getElementById("customDownloadUrl")
-              .value.trim();
-            if (!targetFile) {
-              showNotification(
-                "下载失败",
-                "请输入自定义路径，或选择预定义路径",
-                "error",
-              );
-              showLoading(false, "downloadSubBtn");
-              return;
-            }
-          } else {
-            targetFile = selectedOption;
+          const selection = resolveSelectedPathTarget(
+            "downloadUrlSelect",
+            "customDownloadUrl",
+          );
+          if (!selection.file) {
+            showNotification(
+              "下载失败",
+              "请输入自定义路径，或选择预定义路径",
+              "error",
+            );
+            showLoading(false, "downloadSubBtn");
+            return;
           }
+          const targetFile = selection.file;
 
           // 根据选择的路径设置要下载的文件
-          const mainNodeFile = document
-            .getElementById("mainNodeFile")
-            .value.trim();
-          const plainNodeFile = document
-            .getElementById("plainNodeFile")
-            .value.trim();
-          const optimalNodeFile = document
-            .getElementById("optimalNodeFile")
-            .value.trim();
+          const mainNodeFile = getGithubFileInputValue(
+            "mainNodeFile",
+            "main",
+          );
+          const plainNodeFile = getGithubFileInputValue(
+            "plainNodeFile",
+            "plain",
+          );
+          const optimalNodeFile = getGithubFileInputValue(
+            "optimalNodeFile",
+            "optimal",
+          );
 
           let downloadFiles = [];
 
-          if (targetFile === "Main") {
+          if (selection.key === "main") {
             downloadFiles = [{ file: mainNodeFile, type: "base64" }];
-          } else if (targetFile === "Plain") {
+          } else if (selection.key === "plain") {
             downloadFiles = [{ file: plainNodeFile, type: "plain" }];
-          } else if (targetFile === "Optimal") {
+          } else if (selection.key === "optimal") {
             downloadFiles = [{ file: optimalNodeFile, type: "base64" }];
           } else {
             // 自定义路径，尝试下载
@@ -5933,14 +6098,14 @@
             try {
               // 添加时间戳防止缓存
               const timestamp = Date.now();
-              const fileUrl = `https://api.github.com/repos/${repo}/contents/${fileInfo.file}?ref=${branch}&t=${timestamp}`;
+              const fileUrl = `${apiBaseUrl}/repos/${repo}/contents/${fileInfo.file}?ref=${branch}&t=${timestamp}`;
 
               console.log(`正在下载文件: ${fileInfo.file}`, fileUrl);
 
               const fileRes = await fetch(fileUrl, {
                 headers: {
                   Authorization: `token ${token}`,
-                  Accept: "application/vnd.github.v3+json",
+                  Accept: apiAccept,
                 },
               });
 
@@ -6381,53 +6546,39 @@
           }
 
           // 获取选择的上传路径
-          const pathSelect = document.getElementById("uploadPathSelect");
-          const selectedOption = pathSelect.value;
-          let targetFile = "";
-
-          if (selectedOption === "custom") {
-            targetFile = document
-              .getElementById("customUploadPath")
-              .value.trim();
-            if (!targetFile) {
-              showNotification(
-                "上传失败",
-                "请输入自定义上传路径，或选择预定义路径",
-                "error",
-              );
-              showLoading(false, "uploadLocalBase64ToPathBtn");
-              return;
-            }
-          } else {
-            targetFile = selectedOption;
+          const selection = resolveSelectedPathTarget(
+            "uploadPathSelect",
+            "customUploadPath",
+          );
+          if (!selection.file) {
+            showNotification(
+              "上传失败",
+              "请输入自定义上传路径，或选择预定义路径",
+              "error",
+            );
+            showLoading(false, "uploadLocalBase64ToPathBtn");
+            return;
           }
+          const targetFile = selection.file;
+          const isPlain = selection.key === "plain";
 
           // 根据目标路径决定上传格式
           let contentToUpload = "";
 
-          if (targetFile === "Plain") {
+          if (isPlain) {
             // Plain：上传明文节点
-            const plainText = data.vlessLinks.join("\n");
-            contentToUpload = utf8ToBase64(plainText);
-          } else if (
-            targetFile === "Optimal" ||
-            targetFile === "Main"
-          ) {
-            // Optimal 和 Main：上传双重Base64编码
-            const firstBase64 = utf8ToBase64(data.vlessLinks.join("\n"));
-            contentToUpload = btoa(firstBase64);
+            contentToUpload = utf8ToBase64(data.vlessLinks.join("\n"));
           } else {
-            // 其他自定义路径：上传双重Base64编码
+            // Optimal、Main 和自定义路径：上传双重Base64编码
             const firstBase64 = utf8ToBase64(data.vlessLinks.join("\n"));
             contentToUpload = btoa(firstBase64);
-            // contentToUpload = data.localBase64Content || btoa(data.vlessLinks.join('\n'));
           }
 
           // 使用通用上传函数
           const result = await uploadToGitHub(
             targetFile,
             contentToUpload,
-            targetFile !== "Plain",
+            !isPlain,
             `上传本地订阅到 ${targetFile} - ${new Date().toLocaleString()} (${data.vlessLinks.length}节点)`,
           );
 
@@ -6454,7 +6605,7 @@
 
           // 同时上传对应的YAML配置文件
           try {
-            const yamlFileName = targetFile.replace(/\.[^/.]+$/, "") + ".yaml"; // 替换扩展名为.yaml
+            const yamlFileName = toYamlFileName(targetFile);
             const yamlContent = generateClashYAML(data.vlessLinks);
 
             const yamlResult = await uploadToGitHub(
@@ -6515,9 +6666,7 @@
             return;
           }
 
-          const mainNodeFile = document
-            .getElementById("mainNodeFile")
-            .value.trim();
+          const mainNodeFile = getGithubFileInputValue("mainNodeFile", "main");
           const plainText = data.uniqueNodes.join("\n");
 
           // 修复：双重Base64编码（符合订阅格式）
@@ -6555,8 +6704,7 @@
 
           // 同时上传对应的YAML配置文件
           try {
-            const yamlFileName =
-              mainNodeFile.replace(/\.[^/.]+$/, "") + ".yaml";
+            const yamlFileName = toYamlFileName(mainNodeFile);
             const yamlContent = data.mergedYamlContent;
 
             const yamlResult = await uploadToGitHub(
@@ -6617,9 +6765,10 @@
             return;
           }
 
-          const optimalNodeFile = document
-            .getElementById("optimalNodeFile")
-            .value.trim();
+          const optimalNodeFile = getGithubFileInputValue(
+            "optimalNodeFile",
+            "optimal",
+          );
           const plainText = data.uniqueNodes.join("\n");
 
           // 双重Base64编码（符合订阅格式）
@@ -6657,8 +6806,7 @@
 
           // 同时上传对应的YAML配置文件（使用与Main相同的文件名模式）
           try {
-            const yamlFileName =
-              optimalNodeFile.replace(/\.[^/.]+$/, "") + ".yaml";
+            const yamlFileName = toYamlFileName(optimalNodeFile);
             const yamlContent = data.mergedYamlContent;
 
             const yamlResult = await uploadToGitHub(
@@ -6720,43 +6868,31 @@
           }
 
           // 获取选择的上传路径
-          const pathSelect = document.getElementById("uploadPathSelect");
-          const selectedOption = pathSelect.value;
-          let targetFile = "";
-
-          if (selectedOption === "custom") {
-            targetFile = document
-              .getElementById("customUploadPath")
-              .value.trim();
-            if (!targetFile) {
-              showNotification(
-                "上传失败",
-                "请输入自定义上传路径，或选择预定义路径",
-                "error",
-              );
-              showLoading(false, "uploadMergedToPathBtn");
-              return;
-            }
-          } else {
-            targetFile = selectedOption;
+          const selection = resolveSelectedPathTarget(
+            "uploadPathSelect",
+            "customUploadPath",
+          );
+          if (!selection.file) {
+            showNotification(
+              "上传失败",
+              "请输入自定义上传路径，或选择预定义路径",
+              "error",
+            );
+            showLoading(false, "uploadMergedToPathBtn");
+            return;
           }
+          const targetFile = selection.file;
+          const isPlain = selection.key === "plain";
 
           const plainText = data.uniqueNodes.join("\n");
           let contentToUpload = "";
 
           // 根据目标路径决定上传格式
-          if (targetFile === "Plain") {
+          if (isPlain) {
             // Plain：上传明文节点
             contentToUpload = utf8ToBase64(plainText);
-          } else if (
-            targetFile === "Optimal" ||
-            targetFile === "Main"
-          ) {
-            // Optimal 和 Main：上传双重Base64编码
-            const firstBase64 = utf8ToBase64(plainText);
-            contentToUpload = btoa(firstBase64);
           } else {
-            // 其他自定义路径：使用双重Base64编码
+            // Optimal、Main 和自定义路径：使用双重Base64编码
             const firstBase64 = utf8ToBase64(plainText);
             contentToUpload = btoa(firstBase64);
           }
@@ -6765,7 +6901,7 @@
           const result = await uploadToGitHub(
             targetFile,
             contentToUpload,
-            targetFile !== "Plain",
+            !isPlain,
             `上传合并订阅到指定路径 ${targetFile} - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
           );
 
@@ -6792,7 +6928,7 @@
 
           // 同时上传对应的YAML配置文件
           try {
-            const yamlFileName = targetFile.replace(/\.[^/.]+$/, "") + ".yaml";
+            const yamlFileName = toYamlFileName(targetFile);
             const yamlContent = data.mergedYamlContent;
 
             const yamlResult = await uploadToGitHub(
@@ -6857,21 +6993,21 @@
           mergeAndShow();
 
           // 4. 保存令牌
-          const token = document.getElementById("githubToken").value.trim();
+          const token = getGithubToken();
           if (!token) throw new Error("缺少GitHub Token");
           if (document.getElementById("saveToken").checked)
-            localStorage.setItem("github_token", token);
+            localStorage.setItem(getGithubTokenStorageKey(), token);
 
           // 5. 获取配置
-          const mainNodeFile = document
-            .getElementById("mainNodeFile")
-            .value.trim();
-          const plainNodeFile = document
-            .getElementById("plainNodeFile")
-            .value.trim();
-          const optimalNodeFile = document
-            .getElementById("optimalNodeFile")
-            .value.trim();
+          const mainNodeFile = getGithubFileInputValue("mainNodeFile", "main");
+          const plainNodeFile = getGithubFileInputValue(
+            "plainNodeFile",
+            "plain",
+          );
+          const optimalNodeFile = getGithubFileInputValue(
+            "optimalNodeFile",
+            "optimal",
+          );
           const plainText = data.uniqueNodes.join("\n");
 
           // 双重Base64编码
@@ -6918,8 +7054,7 @@
 
           // 9. 上传对应的YAML配置文件
           try {
-            const yamlFileName =
-              mainNodeFile.replace(/\.[^/.]+$/, "") + ".yaml";
+            const yamlFileName = toYamlFileName(mainNodeFile);
             const yamlContent = data.mergedYamlContent;
 
             await uploadToGitHub(
@@ -7010,7 +7145,7 @@
 
         if (toolType === "clash") {
           content = generateClashYAML(nodes);
-          filename = `clash-config-${new Date().toISOString().split("T")[0]}.yaml`;
+          filename = `clash-config-${new Date().toISOString().split("T")[0]}${getYamlExtension()}`;
           mimeType = "application/x-yaml";
         } else {
           showNotification("错误", "不支持的代理工具类型", "error");
@@ -7101,61 +7236,12 @@
           }
         });
 
+        const clashConfig = getClashConfig();
         const config = {
-          port: 7890,
-          "socks-port": 7891,
-          "redir-port": 7892,
-          "mixed-port": 7893,
-          "tproxy-port": 7895,
-          "allow-lan": true,
-          mode: "rule",
-          "log-level": "info",
-          ipv6: false,
-          "external-controller": "127.0.0.1:9090",
-          dns: {
-            enable: true,
-            ipv6: false,
-            "enhanced-mode": "fake-ip",
-            "fake-ip-range": "198.18.0.1/16",
-            nameserver: ["8.8.8.8", "223.5.5.5", "1.1.1.1"],
-          },
-          proxies: proxies,
-          "proxy-groups": [
-            {
-              name: "🚀 节点选择",
-              type: "select",
-              proxies: proxyNames,
-            },
-            {
-              name: "♻️ 自动选择",
-              type: "url-test",
-              proxies: proxyNames,
-              // 使用 Cloudflare 的检测端点，通常中国大陆通过代理可访问，减少被GFW阻断导致的测速失败
-              url: "https://www.cloudflare.com/cdn-cgi/trace",
-              interval: 300,
-            },
-            {
-              name: "🔥 故障转移",
-              type: "fallback",
-              proxies: proxyNames,
-              // 故障转移也使用同样的检测URL以便在国内环境下更可靠地检测可用节点
-              url: "https://www.cloudflare.com/cdn-cgi/trace",
-              interval: 300,
-            },
-          ],
-          rules: [
-            "DOMAIN-SUFFIX,google.com,♻️ 自动选择",
-            "DOMAIN-SUFFIX,youtube.com,♻️ 自动选择",
-            "DOMAIN-SUFFIX,github.com,♻️ 自动选择",
-            "DOMAIN-SUFFIX,twitter.com,♻️ 自动选择",
-            "DOMAIN-SUFFIX,facebook.com,♻️ 自动选择",
-            "DOMAIN-SUFFIX,instagram.com,♻️ 自动选择",
-            "DOMAIN-SUFFIX,telegram.org,♻️ 自动选择",
-            "DOMAIN-SUFFIX,netflix.com,♻️ 自动选择",
-            "DOMAIN-SUFFIX,spotify.com,♻️ 自动选择",
-            "GEOIP,CN,DIRECT",
-            "MATCH,♻️ 自动选择",
-          ],
+          "proxy-groups": (
+            Array.isArray(clashConfig.proxyGroups) ? clashConfig.proxyGroups : []
+          ).map((group) => Object.assign({}, group, { proxies: proxyNames })),
+          rules: Array.isArray(clashConfig.rules) ? clashConfig.rules : [],
         };
 
         // 使用js-yaml库或手动构建YAML格式
@@ -7238,17 +7324,18 @@
           yamlContent += "  - " + rule + "\n";
         });
 
-        // 添加其他配置
-        yamlContent += "\nport: 7890\n";
-        yamlContent += "socks-port: 7891\n";
-        yamlContent += "redir-port: 7892\n";
-        yamlContent += "mixed-port: 7893\n";
-        yamlContent += "tproxy-port: 7895\n";
-        yamlContent += "allow-lan: true\n";
-        yamlContent += "mode: rule\n";
-        yamlContent += "log-level: info\n";
-        yamlContent += "ipv6: false\n";
-        yamlContent += "external-controller: 127.0.0.1:9090\n";
+        // 添加其他配置（均来自 config.js 的 clash 配置）
+        const ports = clashConfig.ports || {};
+        yamlContent += `\nport: ${ports.port || 7890}\n`;
+        yamlContent += `socks-port: ${ports["socks-port"] || 7891}\n`;
+        yamlContent += `redir-port: ${ports["redir-port"] || 7892}\n`;
+        yamlContent += `mixed-port: ${ports["mixed-port"] || 7893}\n`;
+        yamlContent += `tproxy-port: ${ports["tproxy-port"] || 7895}\n`;
+        yamlContent += `allow-lan: ${typeof clashConfig.allowLan === "boolean" ? clashConfig.allowLan : true}\n`;
+        yamlContent += `mode: ${clashConfig.mode || "rule"}\n`;
+        yamlContent += `log-level: ${clashConfig.logLevel || "info"}\n`;
+        yamlContent += `ipv6: ${typeof clashConfig.ipv6 === "boolean" ? clashConfig.ipv6 : false}\n`;
+        yamlContent += `external-controller: ${clashConfig.externalController || "127.0.0.1:9090"}\n`;
 
         return yamlContent;
       }
@@ -7393,27 +7480,16 @@
         notificationContainer.appendChild(notification);
         notifications.active.push(notificationId);
 
-        // 自动关闭通知（错误通知不自动关闭）
-        if (type !== "error") {
-          let timeoutDuration = 6000; // 默认6秒
-
-          // 根据类型设置不同时间
-          if (type === "success") {
-            timeoutDuration = 2000; // 成功通知显示2秒
-          } else if (type === "info") {
-            timeoutDuration = 3000; // 信息通知显示3秒
-          } else if (type === "warning") {
-            timeoutDuration = 6000; // 警告通知显示6秒
-          }
-
-          setTimeout(() => {
-            closeNotification(notificationId);
-          }, timeoutDuration);
-        } else {
-          setTimeout(() => {
-            closeNotification(notificationId);
-          }, 10000); // 错误通知显示10秒
-        }
+        // 自动关闭通知，各类型的显示时长由 config.js 配置
+        const durationConfig =
+          (getWebConfig().notifications || {}).durations || {};
+        const timeoutDuration =
+          Number(durationConfig[type]) ||
+          Number(durationConfig.default) ||
+          6000;
+        setTimeout(() => {
+          closeNotification(notificationId);
+        }, timeoutDuration);
       }
 
       // 新增：关闭通知函数
@@ -7508,7 +7584,7 @@
       }
 
       function loadSavedToken() {
-        const token = localStorage.getItem("github_token");
+        const token = localStorage.getItem(getGithubTokenStorageKey());
         if (token) {
           document.getElementById("githubToken").value = token;
           console.log("✅ 从本地存储加载GitHub令牌");
@@ -7708,12 +7784,18 @@
           return;
         }
 
-        const size = 320;
-        const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(targetUrl)}`;
+        const qrConfig = getQrConfig();
+        const size = Number(qrConfig.size) > 0 ? Number(qrConfig.size) : 320;
+        const apiUrl = buildQrServiceUrl(
+          qrConfig.fallbackService ||
+            "https://api.qrserver.com/v1/create-qr-code/?size={size}x{size}&data={data}",
+          size,
+          targetUrl,
+        );
 
         // 使用可读的缓存键（base64的URL）
         const cacheKey =
-          "qr_cache_" +
+          (qrConfig.cacheKeyPrefix || "qr_cache_") +
           btoa(unescape(encodeURIComponent(targetUrl))).replace(/=/g, "");
 
         let modal = document.getElementById("qrModal");
@@ -7794,7 +7876,8 @@
             // 从 CDN 动态加载（用户可根据网络调整）
             try {
               await loadScript(
-                "https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js",
+                qrConfig.libraryUrl ||
+                  "https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js",
               );
             } catch (e) {
               console.warn("本地二维码库加载失败", e);
@@ -7832,18 +7915,19 @@
           return null;
         }
 
-        // 外部服务备选（优先中国友好服务）
-        const externalCandidates = [
-          // 草料二维码变体（优先）
-          // 已移除无效的 `https://cli.im/api?text=` 入口，保留有效的 qrcode 接口作为首选
-          `https://cli.im/api/qrcode?text=${encodeURIComponent(targetUrl)}&w=${size}`,
-          // api.qrserver.com（原先使用）
-          `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(targetUrl)}`,
-          // Google Chart（有时可用）
-          `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(targetUrl)}`,
-        ];
+        // 外部服务备选（来自 config.js 的 qr.services，按顺序尝试）
+        const externalCandidates = (
+          Array.isArray(qrConfig.services) ? qrConfig.services : []
+        ).map((template) => buildQrServiceUrl(template, size, targetUrl));
+        if (externalCandidates.length === 0) {
+          externalCandidates.push(apiUrl);
+        }
 
         // 备用：通过直接加载 <img> 的方式回退（不转换为dataURL）
+        const imageTimeout =
+          Number(qrConfig.imageTimeout) > 0
+            ? Number(qrConfig.imageTimeout)
+            : 4000;
         function tryImageLoad(url) {
           return new Promise((resolve) => {
             const testImg = new Image();
@@ -7851,7 +7935,7 @@
             testImg.onerror = () => resolve(false);
             testImg.src = url;
             // 超时处理
-            setTimeout(() => resolve(false), 4000);
+            setTimeout(() => resolve(false), imageTimeout);
           });
         }
 

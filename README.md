@@ -7,15 +7,32 @@
 - NodeWeb 生成页：https://daizhouhui.github.io/NodeWeb/
 - 节点仓库主页（Worker）：https://manager.knny.dpdns.org
 
-默认情况下，上传订阅文件成功后，页面会调用 Worker 的 `/api/subscription-link` 接口，获取并显示由 Worker 返回的受保护订阅链接（仅限 `config.js` 中 `workerRepo` 指定的仓库）；切换到其他仓库或手动选择 GitHub Raw/Pages 时仍使用原有 GitHub 链接。Worker 不可用时会自动回退到 GitHub Raw。
+默认情况下，上传订阅文件成功后，页面会调用 Worker 的 `/api/subscription-link` 接口，获取并显示由 Worker 返回的受保护订阅链接（仅限 `config.js` 中 `github.worker.repo` 指定的仓库）；切换到其他仓库或手动选择 GitHub Raw/Pages 时仍使用原有 GitHub 链接。Worker 不可用时会自动回退到 GitHub Raw。
+
+## 配置文件
+
+所有配置项集中在根目录的 `config.js` 中，按以下顺序分组：
+
+- `defaultVlessConfig`：Vless 节点默认配置（UUID、Host、SNI、Path、指纹、ECH、默认端口、别名前缀、固定协议参数和页面默认勾选项）。
+- `github`：GitHub 订阅同步配置，包括仓库、分支、令牌存储键、订阅文件名、默认下载/上传路径、链接类型、GitHub API、重试策略和 Cloudflare Worker。
+- `vlessPresets`：高级配置中 UUID / Host / SNI / Path / 指纹的下拉候选值。
+- `theme`：主题列表、默认主题、本地存储键和移动端断点。
+- `ui`：界面开关与交互延迟。
+- `csv`：CSV 列默认值。
+- `logs` / `notifications`：日志保留条数与通知显示时长。
+- `clash`：Clash YAML 的文件名、端口、代理组和分流规则。
+- `qr`：二维码尺寸、缓存键、库地址和外部服务列表。
+- `geolocation`：IP 属地数据库的加载路径。
+
+修改 `config.js` 后刷新页面即可生效。页面中的输入框会自动使用这些默认值，但仍可在页面上临时修改。
 
 ## 使用指南
 
 本工具可以从 CSV/TXT 或 IP:端口文本生成 VLESS 节点，也可以载入已有的 VLESS 直链。生成结果可在页面中复制、下载、转换成 Base64 或 YAML，并可选择与 GitHub 仓库中的订阅合并。
 
-页面快捷操作区可循环切换六种主题，所选样式会保存在当前浏览器中。新浏览器的默认主题由根目录的 `config.js` 控制；将 `defaultTheme` 设置为 `1`（经典浅色）、`2`（经典暗夜）、`3`（澄光浅色）、`4`（澄光暗夜）、`5`（莓紫轻羽）或 `6`（莓紫夜幕）。已保存的浏览器主题优先于该默认设置。
+页面快捷操作区可循环切换六种主题，所选样式会保存在当前浏览器中。新浏览器的默认主题由根目录的 `config.js` 控制；将 `theme.default` 设置为 `1`（经典浅色）、`2`（经典暗夜）、`3`（澄光浅色）、`4`（澄光暗夜）、`5`（莓紫轻羽）或 `6`（莓紫夜幕）。已保存的浏览器主题优先于该默认设置。
 
-三个“上传合并”订阅按钮默认隐藏。需要显示时，在 `config.js` 中将 `showMergedSubscriptionUploadButtons` 设为 `true`。默认订阅文件名为 `Optimal`、`Main` 和 `Plain`。
+三个“上传合并”订阅按钮默认隐藏。需要显示时，在 `config.js` 中将 `ui.showMergedSubscriptionUploadButtons` 设为 `true`。默认订阅文件名在 `github.files` 中配置（`Optimal`、`Main` 和 `Plain`）。
 
 ## 1. 导入节点数据
 
@@ -83,8 +100,8 @@ ip,port,city,country,speed
 
 1. 在“GitHub订阅同步”的“常用”页签输入 GitHub 令牌。令牌需有目标仓库所需的访问权限；页面会提示所需权限。
 2. 可选中“保存令牌到本地存储”以便下次使用。不希望在当前浏览器保存时取消勾选。
-3. 在“高级（不常用）”页签确认仓库（默认 `DaiZhouHui/CustomNode`）、分支（默认 `main`）和订阅文件名。
-4. 在“生成链接类型”中选择链接方式：`Worker 订阅链接`（默认，仅限 `workerRepo` 指定的仓库）、`GitHub Raw` 或 `GitHub Pages`。选择 Worker 时，若仓库不匹配或请求失败会自动回退 GitHub Raw；选择 Raw/Pages 则保留原有的纯 GitHub 链接方式。
+3. 在“高级（不常用）”页签确认仓库（默认取 `github.repo`，即 `DaiZhouHui/CustomNode`）、分支（默认取 `github.branch`，即 `main`）和订阅文件名（`github.files.optimal` / `main` / `plain`）。
+4. 在“生成链接类型”中选择链接方式：`Worker 订阅链接`（默认，仅限 `github.worker.repo` 指定的仓库）、`GitHub Raw` 或 `GitHub Pages`。选择 Worker 时，若仓库不匹配或请求失败会自动回退 GitHub Raw；选择 Raw/Pages 则保留原有的纯 GitHub 链接方式。
 
 不要将访问令牌粘贴到公开内容或提交到代码仓库。对不再使用的令牌，应在 GitHub 设置中撤销。
 
@@ -102,11 +119,11 @@ Content-Type: application/json
 
 请求成功时，页面使用响应中的 `url` 作为订阅链接。YAML 配置文件不是订阅文件，仍显示 GitHub 链接（默认 Raw）。
 
-“生成链接类型”默认选中 Worker；也可以手动切换回 GitHub Raw 或 GitHub Pages，继续使用原来的链接方式。Worker 目前只管理 `config.js` 中 `workerRepo` 指定的仓库（默认 `DaiZhouHui/CustomNode`），切换到其他仓库时会自动改用 GitHub Raw，不会请求 Worker。
+“生成链接类型”默认选中 Worker（`github.defaultLinkType`）；也可以手动切换回 GitHub Raw 或 GitHub Pages，继续使用原来的链接方式。Worker 目前只管理 `config.js` 中 `github.worker.repo` 指定的仓库（默认 `DaiZhouHui/CustomNode`），切换到其他仓库时会自动改用 GitHub Raw，不会请求 Worker。
 
 若 Worker 请求失败（例如令牌无效、网络异常或跨域被拒绝），页面会提示“订阅链接回退”，并自动使用 GitHub Raw 链接，不影响文件本身已上传成功的结果。
 
-Worker 地址在 `config.js` 的 `workerBaseUrl` 中配置，管理仓库由 `workerRepo` 配置；将 `workerBaseUrl` 留空可禁用 Worker 链接。
+Worker 地址在 `config.js` 的 `github.worker.baseUrl` 中配置，管理仓库由 `github.worker.repo` 配置；将 `github.worker.baseUrl` 留空可禁用 Worker 链接。
 
 ### 下载与合并
 
@@ -142,7 +159,7 @@ Worker 地址在 `config.js` 的 `workerBaseUrl` 中配置，管理仓库由 `wo
 
 ## 隐私与安全
 
-节点数据在浏览器中处理。使用 GitHub 同步时，工具会通过 GitHub API 访问你配置的仓库；若勾选保存令牌，令牌会保存在当前浏览器的本地存储中。上传订阅文件后，工具还会把令牌以 `Bearer` 方式发送到 `config.js` 中 `workerBaseUrl` 指定的 Cloudflare Worker，用于验证私有仓库访问权限并生成受保护订阅链接。请确认该地址是你信任的服务，使用最小必要权限，并避免在共享设备上保存令牌。
+节点数据在浏览器中处理。使用 GitHub 同步时，工具会通过 GitHub API 访问你配置的仓库；若勾选保存令牌，令牌会保存在当前浏览器的本地存储中。上传订阅文件后，工具还会把令牌以 `Bearer` 方式发送到 `config.js` 中 `github.worker.baseUrl` 指定的 Cloudflare Worker，用于验证私有仓库访问权限并生成受保护订阅链接。请确认该地址是你信任的服务，使用最小必要权限，并避免在共享设备上保存令牌。
 
 ## 参与贡献
 
