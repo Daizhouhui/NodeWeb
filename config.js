@@ -110,7 +110,7 @@ window.NODE_WEB_CONFIG = {
       "88888888-8888-8888-9888-88abcdefabcd"
     ],
     host: [
-      "s.kyma.dpdns.org",
+      "lin.kyma.dpdns.org",
       "node.knny.dpdns.org",
       "node.soren920.dpdns.org",
       "onlycore.knny.dpdns.org",
@@ -118,7 +118,7 @@ window.NODE_WEB_CONFIG = {
       "el.kyma.dpdns.org"
     ],
     sni: [
-      "s.kyma.dpdns.org",
+      "lin.kyma.dpdns.org",
       "node.knny.dpdns.org",
       "node.soren920.dpdns.org",
       "onlycore.knny.dpdns.org",
