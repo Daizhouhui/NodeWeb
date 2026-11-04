@@ -2,25 +2,12 @@
 
 一个功能强大的Web工具，用于将CSV数据转换为Vless节点链接，生成Base64订阅，并与GitHub仓库同步。
 
-默认示例 GitHub Pages 发布页（基于默认仓库设置 `DaiZhouHui/CustomNode`）：
+节点仓库已设为私有，对应的仓库主页和订阅入口由 Cloudflare Worker 提供：
 
-- 网页首页：https://daizhouhui.github.io/NodeWeb/
+- NodeWeb 生成页：https://daizhouhui.github.io/NodeWeb/
+- 节点仓库主页（Worker）：https://manager.knny.dpdns.org
 
-节点仓库（基于默认仓库设置 `DaiZhouHui/CustomNode`）：
-
-- 仓库首页 ：https://github.com/DaiZhouHui/CustomNode
-
-默认三个节点订阅文件（Pages 版本示例）：
-
-- 主要订阅（Pages）: https://daizhouhui.github.io/CustomNode/Main
-- 优选订阅（Pages）: https://daizhouhui.github.io/CustomNode/Optimal
-- 明文订阅（Pages）: https://daizhouhui.github.io/CustomNode/Plain
-
-默认三个节点订阅文件（Raw 版本示例）：
-
-- 主要订阅（Raw）: https://raw.githubusercontent.com/DaiZhouHui/CustomNode/main/Main
-- 优选订阅（Raw）: https://raw.githubusercontent.com/DaiZhouHui/CustomNode/main/Optimal
-- 明文订阅（Raw）: https://raw.githubusercontent.com/DaiZhouHui/CustomNode/main/Plain
+上传订阅文件成功后，页面会调用 Worker 的 `/api/subscription-link` 接口，获取并显示由 Worker 返回的受保护订阅链接；不再直接展示私有仓库的 Raw/Pages 链接。Worker 不可用时会自动回退到 GitHub 链接。
 
 ## 使用指南
 
@@ -101,6 +88,24 @@ ip,port,city,country,speed
 
 不要将访问令牌粘贴到公开内容或提交到代码仓库。对不再使用的令牌，应在 GitHub 设置中撤销。
 
+### 订阅链接（Cloudflare Worker）
+
+订阅文件（Main、Optimal、Plain 以及自定义订阅路径）上传成功后，页面会携带当前 GitHub 令牌请求 Worker：
+
+```http
+POST https://manager.knny.dpdns.org/api/subscription-link
+Authorization: Bearer <githubToken>
+Content-Type: application/json
+
+{ "file": "上传的文件名" }
+```
+
+请求成功时，页面使用响应中的 `url` 作为订阅链接。YAML 配置文件不是订阅文件，仍显示 GitHub 链接。
+
+若 Worker 请求失败（例如令牌无效、网络异常或跨域被拒绝），页面会提示“订阅链接回退”，并自动使用“GitHub 回退链接类型”中选择的 Raw 或 Pages 链接，不影响文件本身已上传成功的结果。
+
+Worker 地址在 `config.js` 的 `workerBaseUrl` 中配置；留空可禁用 Worker 链接。
+
 ### 下载与合并
 
 - 选择远程订阅路径，点击“下载远程订阅”载入节点。
@@ -135,7 +140,7 @@ ip,port,city,country,speed
 
 ## 隐私与安全
 
-节点数据在浏览器中处理。使用 GitHub 同步时，工具会通过 GitHub API 访问你配置的仓库；若勾选保存令牌，令牌会保存在当前浏览器的本地存储中。请使用最小必要权限，并避免在共享设备上保存令牌。
+节点数据在浏览器中处理。使用 GitHub 同步时，工具会通过 GitHub API 访问你配置的仓库；若勾选保存令牌，令牌会保存在当前浏览器的本地存储中。上传订阅文件后，工具还会把令牌以 `Bearer` 方式发送到 `config.js` 中 `workerBaseUrl` 指定的 Cloudflare Worker，用于验证私有仓库访问权限并生成受保护订阅链接。请确认该地址是你信任的服务，使用最小必要权限，并避免在共享设备上保存令牌。
 
 ## 参与贡献
 

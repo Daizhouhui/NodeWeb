@@ -138,7 +138,7 @@
         <button
           class="quick-btn"
           onclick="
-            window.location.href = 'https://daizhouhui.github.io/CustomNode/'
+            window.location.href = 'https://manager.knny.dpdns.org'
           "
         >
           <span>🏢</span> 节点仓库
@@ -1067,7 +1067,7 @@
                 <div class="config-row">
                   <div class="form-group">
                     <label for="fileLinkTypeSelect"
-                      >生成链接类型（默认 GitHub Raw）</label
+                      >GitHub 回退链接类型</label
                     >
                     <select id="fileLinkTypeSelect">
                       <option value="raw">
@@ -1078,7 +1078,7 @@
                       </option>
                     </select>
                     <div class="help-text">
-                      选择网页上显示/复制的链接类型，默认使用 GitHub Pages
+                      仅在 Worker 订阅链接获取失败时使用，默认 GitHub Raw
                     </div>
                   </div>
                 </div>
@@ -1140,13 +1140,18 @@
               </div>
             </div>
 
-            <!-- GitHub.io链接显示区域 -->
+            <!-- 订阅链接显示区域 -->
             <div
               class="github-links-section"
               id="githubLinksSection"
               style="display: none"
             >
-              <h3>🔗 GitHub.io 订阅链接</h3>
+              <h3>🔗 订阅链接</h3>
+              <div class="help-text" style="margin-bottom: 12px">
+                订阅文件链接由 Cloudflare Worker
+                生成；YAML 配置链接仍来自 GitHub。Worker 不可用时会自动回退到
+                GitHub 链接。
+              </div>
               <div class="github-links-container">
                 <div
                   class="github-link-item"
@@ -1725,12 +1730,143 @@
 
       // 定时同步功能已移除
 
+      // Cloudflare Worker 订阅管理服务：上传订阅文件后获取受保护的订阅链接
+      const DEFAULT_WORKER_BASE_URL = "https://manager.knny.dpdns.org";
+      const WORKER_SUBSCRIPTION_TIMEOUT = 15000;
+      let workerLinkWarningShown = false;
+
+      function getWorkerBaseUrl() {
+        const config = window.NODE_WEB_CONFIG || {};
+        const configuredUrl = config.workerBaseUrl;
+        if (configuredUrl === false || configuredUrl === null) {
+          return "";
+        }
+        if (typeof configuredUrl === "string") {
+          // 显式留空表示禁用 Worker
+          return configuredUrl.trim().replace(/\/+$/, "");
+        }
+        // 旧版 config.js 未配置该项时使用默认地址
+        return DEFAULT_WORKER_BASE_URL.replace(/\/+$/, "");
+      }
+
+      function isSubscriptionFile(fileName) {
+        // YAML 是配置文件而不是订阅文件，继续使用 GitHub 链接
+        return !/\.ya?ml$/i.test(fileName);
+      }
+
+      async function fetchWorkerSubscriptionLink(fileName, token) {
+        const workerBaseUrl = getWorkerBaseUrl();
+        if (!workerBaseUrl) {
+          throw new Error("未配置 Cloudflare Worker 服务地址");
+        }
+        if (!token) {
+          throw new Error("缺少GitHub Token，无法向 Worker 验证身份");
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(
+          () => controller.abort(),
+          WORKER_SUBSCRIPTION_TIMEOUT,
+        );
+
+        try {
+          const response = await fetch(
+            `${workerBaseUrl}/api/subscription-link`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ file: fileName }),
+              signal: controller.signal,
+            },
+          );
+
+          let result = null;
+          try {
+            result = await response.json();
+          } catch (e) {
+            result = null;
+          }
+
+          if (!response.ok) {
+            throw new Error(
+              (result && result.error) ||
+                `获取订阅链接失败（HTTP ${response.status}）`,
+            );
+          }
+
+          if (!result || typeof result.url !== "string" || !result.url.trim()) {
+            throw new Error("Worker 未返回有效的订阅链接");
+          }
+
+          // 兼容 Worker 返回相对路径的情况
+          const url = result.url.trim();
+          const resolvedUrl = /^https?:\/\//i.test(url)
+            ? url
+            : new URL(url, `${workerBaseUrl}/`).href;
+          if (!/^https?:\/\//i.test(resolvedUrl)) {
+            throw new Error("Worker 返回的订阅链接格式无效");
+          }
+          return resolvedUrl;
+        } catch (error) {
+          if (error.name === "AbortError") {
+            throw new Error("获取订阅链接超时，请稍后重试");
+          }
+          throw error;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }
+
+      async function resolveSubscriptionLink(
+        fileName,
+        token,
+        fallbackUrl,
+        useWorkerLink = true,
+      ) {
+        if (
+          !useWorkerLink ||
+          !isSubscriptionFile(fileName) ||
+          !getWorkerBaseUrl()
+        ) {
+          return { url: fallbackUrl, source: "github", error: null };
+        }
+
+        try {
+          const url = await fetchWorkerSubscriptionLink(fileName, token);
+          console.log(`🔗 ${fileName} 已获取 Worker 订阅链接`);
+          return { url, source: "worker", error: null };
+        } catch (error) {
+          console.warn(
+            `⚠️ 获取 ${fileName} 的 Worker 订阅链接失败，已回退到 GitHub 链接:`,
+            error,
+          );
+          addLog(
+            "订阅链接",
+            `获取 ${fileName} 的 Worker 订阅链接失败，已回退到 GitHub 链接: ${error.message}`,
+            "warning",
+          );
+          if (!workerLinkWarningShown) {
+            workerLinkWarningShown = true;
+            showNotification(
+              "订阅链接回退",
+              `Worker 订阅链接获取失败，已使用 GitHub 链接：${error.message}`,
+              "warning",
+            );
+          }
+          return { url: fallbackUrl, source: "github", error: error.message };
+        }
+      }
+
       // 通用上传函数，包含SHA重试逻辑
       async function uploadToGitHub(
         fileName,
         content,
         isBase64 = false,
         customMessage = "",
+        useWorkerSubscriptionLink = true,
       ) {
         const token = document.getElementById("githubToken").value.trim();
         if (!token) {
@@ -1857,8 +1993,8 @@
                 `✅ ${fileName} 上传成功，新SHA: ${result.content.sha.substring(0, 8)}...`,
               );
 
-              // 生成链接，依据用户在高级配置中选择的链接类型（默认 GitHub Pages）
-              let githubIoUrl = `https://raw.githubusercontent.com/${repo}/${branch}/${fileName}`;
+              // GitHub 回退链接：Worker 不可用时使用，依据高级配置选择链接类型（默认 GitHub Raw）
+              let githubFallbackUrl = `https://raw.githubusercontent.com/${repo}/${branch}/${fileName}`;
               try {
                 const linkTypeEl =
                   document.getElementById("fileLinkTypeSelect");
@@ -1868,21 +2004,34 @@
                   if (parts.length >= 2) {
                     const user = parts[0].toLowerCase();
                     const repoName = parts[1];
-                    githubIoUrl = `https://${user}.github.io/${repoName}/${fileName}`;
+                    githubFallbackUrl = `https://${user}.github.io/${repoName}/${fileName}`;
                   }
                 } else if (linkType === "raw") {
-                  githubIoUrl = `https://raw.githubusercontent.com/${repo}/${branch}/${fileName}`;
+                  githubFallbackUrl = `https://raw.githubusercontent.com/${repo}/${branch}/${fileName}`;
                 }
               } catch (e) {
                 // 回退到 raw 链接
-                githubIoUrl = `https://raw.githubusercontent.com/${repo}/${branch}/${fileName}`;
+                githubFallbackUrl = `https://raw.githubusercontent.com/${repo}/${branch}/${fileName}`;
               }
+
+              // 订阅文件优先使用 Worker 返回的受保护订阅链接
+              const subscriptionLink = await resolveSubscriptionLink(
+                fileName,
+                token,
+                githubFallbackUrl,
+                useWorkerSubscriptionLink,
+              );
 
               return {
                 success: true,
                 sha: result.content.sha,
                 isNew: !fileSha,
-                githubIoUrl: githubIoUrl,
+                // 保持原字段名，页面统一显示该链接
+                githubIoUrl: subscriptionLink.url,
+                subscriptionUrl: subscriptionLink.url,
+                subscriptionSource: subscriptionLink.source,
+                githubFallbackUrl: githubFallbackUrl,
+                workerLinkError: subscriptionLink.error,
               };
             } else {
               const err = await res.json();
@@ -2282,7 +2431,7 @@
           .getElementById("toggleLogBtn")
           .addEventListener("click", toggleLog);
 
-        // 新增：GitHub.io链接复制按钮事件
+        // 新增：订阅链接复制按钮事件
         document
           .getElementById("copyPlainNodesUrl")
           .addEventListener("click", () => copyGithubUrl("plainNodesUrl"));
@@ -2454,7 +2603,7 @@
             "success",
           );
 
-          // 显示GitHub.io链接
+          // 显示订阅链接
           showGithubLink("plainNodesLink", "plainNodesUrl", result.githubIoUrl);
 
           // 同时上传对应的YAML配置文件
@@ -2481,7 +2630,7 @@
               "success",
             );
 
-            // 显示YAML配置文件的GitHub.io链接（复用mergedYamlLink）
+            // 显示YAML配置文件的链接（复用mergedYamlLink）
             showGithubLink(
               "mergedYamlLink",
               "mergedYamlUrl",
@@ -5176,6 +5325,7 @@
             utf8ToBase64(data.manualYamlContent),
             false, // YAML文件不需要Base64编码
             `上传手动转换的Clash YAML配置 - ${new Date().toLocaleString()}`,
+            false, // YAML 配置文件不是订阅文件，不请求 Worker 订阅链接
           );
 
           // 标记缓存需要更新
@@ -5192,7 +5342,7 @@
             "success",
           );
 
-          // 显示GitHub.io链接
+          // 显示订阅链接
           showGithubLink("yamlConfigLink", "yamlConfigUrl", result.githubIoUrl);
         } catch (e) {
           showNotification(
@@ -6243,7 +6393,7 @@
             "success",
           );
 
-          // 显示GitHub.io链接
+          // 显示订阅链接
           showGithubLink(
             "localBase64Link",
             "localBase64Url",
@@ -6273,7 +6423,7 @@
               "success",
             );
 
-            // 显示YAML配置文件的GitHub.io链接
+            // 显示YAML配置文件的链接
             showGithubLink(
               "localYamlLink",
               "localYamlUrl",
@@ -6344,7 +6494,7 @@
             "success",
           );
 
-          // 显示GitHub.io链接
+          // 显示订阅链接
           showGithubLink(
             "mergedBase64Link",
             "mergedBase64Url",
@@ -6375,7 +6525,7 @@
               "success",
             );
 
-            // 显示YAML配置文件的GitHub.io链接
+            // 显示YAML配置文件的链接
             showGithubLink(
               "mergedYamlLink",
               "mergedYamlUrl",
@@ -6446,7 +6596,7 @@
             "success",
           );
 
-          // 显示GitHub.io链接
+          // 显示订阅链接
           showGithubLink(
             "mergedOptimalLink",
             "mergedOptimalUrl",
@@ -6477,7 +6627,7 @@
               "success",
             );
 
-            // 显示YAML配置文件的GitHub.io链接（复用mergedYamlLink）
+            // 显示YAML配置文件的链接（复用mergedYamlLink）
             showGithubLink(
               "mergedYamlLink",
               "mergedYamlUrl",
@@ -6581,7 +6731,7 @@
             "success",
           );
 
-          // 显示GitHub.io链接
+          // 显示订阅链接
           showGithubLink(
             "mergedToPathLink",
             "mergedToPathUrl",
@@ -6611,7 +6761,7 @@
               "success",
             );
 
-            // 显示YAML配置文件的GitHub.io链接（复用mergedYamlLink）
+            // 显示YAML配置文件的链接（复用mergedYamlLink）
             showGithubLink(
               "mergedYamlLink",
               "mergedYamlUrl",
@@ -6757,7 +6907,7 @@
         }
       }
 
-      // 显示GitHub.io链接的函数
+      // 显示订阅链接的函数
       function showGithubLink(linkId, urlId, url) {
         const linkItem = document.getElementById(linkId);
         const urlInput = document.getElementById(urlId);
@@ -6770,14 +6920,14 @@
         }
       }
 
-      // 复制GitHub.io链接的函数
+      // 复制订阅链接的函数
       function copyGithubUrl(urlId) {
         const urlInput = document.getElementById(urlId);
         if (urlInput && urlInput.value) {
           copyText(urlInput.value);
           showNotification(
             "复制成功",
-            "GitHub.io链接已复制到剪贴板",
+            "订阅链接已复制到剪贴板",
             "success",
           );
         }
