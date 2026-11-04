@@ -8,6 +8,10 @@ window.NODE_WEB_CONFIG = {
   // 留空则跳过 Worker，直接使用 GitHub 链接。
   workerBaseUrl: "https://manager.knny.dpdns.org",
 
+  // Worker 仅管理该仓库（格式：owner/repo）
+  // 切换到其他仓库时，页面会自动改用 GitHub 链接，避免请求到不存在的订阅。
+  workerRepo: "DaiZhouHui/CustomNode",
+
   // Vless节点默认配置
   defaultVlessConfig: {
     uuid: "99999999-9999-8999-9999-99abcdefabcd",

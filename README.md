@@ -7,7 +7,7 @@
 - NodeWeb 生成页：https://daizhouhui.github.io/NodeWeb/
 - 节点仓库主页（Worker）：https://manager.knny.dpdns.org
 
-上传订阅文件成功后，页面会调用 Worker 的 `/api/subscription-link` 接口，获取并显示由 Worker 返回的受保护订阅链接；不再直接展示私有仓库的 Raw/Pages 链接。Worker 不可用时会自动回退到 GitHub 链接。
+默认情况下，上传订阅文件成功后，页面会调用 Worker 的 `/api/subscription-link` 接口，获取并显示由 Worker 返回的受保护订阅链接（仅限 `config.js` 中 `workerRepo` 指定的仓库）；切换到其他仓库或手动选择 GitHub Raw/Pages 时仍使用原有 GitHub 链接。Worker 不可用时会自动回退到 GitHub Raw。
 
 ## 使用指南
 
@@ -84,7 +84,7 @@ ip,port,city,country,speed
 1. 在“GitHub订阅同步”的“常用”页签输入 GitHub 令牌。令牌需有目标仓库所需的访问权限；页面会提示所需权限。
 2. 可选中“保存令牌到本地存储”以便下次使用。不希望在当前浏览器保存时取消勾选。
 3. 在“高级（不常用）”页签确认仓库（默认 `DaiZhouHui/CustomNode`）、分支（默认 `main`）和订阅文件名。
-4. 按需选择 Raw 或 GitHub Pages 链接类型。Raw 链接直接从 GitHub 获取文件；Pages 链接需目标仓库已启用并正确配置 GitHub Pages。
+4. 在“生成链接类型”中选择链接方式：`Worker 订阅链接`（默认，仅限 `workerRepo` 指定的仓库）、`GitHub Raw` 或 `GitHub Pages`。选择 Worker 时，若仓库不匹配或请求失败会自动回退 GitHub Raw；选择 Raw/Pages 则保留原有的纯 GitHub 链接方式。
 
 不要将访问令牌粘贴到公开内容或提交到代码仓库。对不再使用的令牌，应在 GitHub 设置中撤销。
 
@@ -100,11 +100,13 @@ Content-Type: application/json
 { "file": "上传的文件名" }
 ```
 
-请求成功时，页面使用响应中的 `url` 作为订阅链接。YAML 配置文件不是订阅文件，仍显示 GitHub 链接。
+请求成功时，页面使用响应中的 `url` 作为订阅链接。YAML 配置文件不是订阅文件，仍显示 GitHub 链接（默认 Raw）。
 
-若 Worker 请求失败（例如令牌无效、网络异常或跨域被拒绝），页面会提示“订阅链接回退”，并自动使用“GitHub 回退链接类型”中选择的 Raw 或 Pages 链接，不影响文件本身已上传成功的结果。
+“生成链接类型”默认选中 Worker；也可以手动切换回 GitHub Raw 或 GitHub Pages，继续使用原来的链接方式。Worker 目前只管理 `config.js` 中 `workerRepo` 指定的仓库（默认 `DaiZhouHui/CustomNode`），切换到其他仓库时会自动改用 GitHub Raw，不会请求 Worker。
 
-Worker 地址在 `config.js` 的 `workerBaseUrl` 中配置；留空可禁用 Worker 链接。
+若 Worker 请求失败（例如令牌无效、网络异常或跨域被拒绝），页面会提示“订阅链接回退”，并自动使用 GitHub Raw 链接，不影响文件本身已上传成功的结果。
+
+Worker 地址在 `config.js` 的 `workerBaseUrl` 中配置，管理仓库由 `workerRepo` 配置；将 `workerBaseUrl` 留空可禁用 Worker 链接。
 
 ### 下载与合并
 

@@ -1066,19 +1066,23 @@
 
                 <div class="config-row">
                   <div class="form-group">
-                    <label for="fileLinkTypeSelect"
-                      >GitHub 回退链接类型</label
-                    >
+                    <label for="fileLinkTypeSelect">生成链接类型</label>
                     <select id="fileLinkTypeSelect">
+                      <option value="worker" selected>
+                        Worker 订阅链接（默认，仅限配置仓库）
+                      </option>
                       <option value="raw">
-                        Raw（https://raw.githubusercontent.com/...）
+                        GitHub Raw（https://raw.githubusercontent.com/...）
                       </option>
                       <option value="pages">
                         GitHub Pages（https://{user}.github.io/{repo}/...）
                       </option>
                     </select>
                     <div class="help-text">
-                      仅在 Worker 订阅链接获取失败时使用，默认 GitHub Raw
+                      默认使用 Cloudflare Worker 生成订阅链接（仅限 config.js 中
+                      workerRepo 指定的仓库）；仓库不匹配或 Worker
+                      请求失败时自动回退 GitHub Raw。也可直接选择 GitHub
+                      Raw/Pages 使用原有方式。
                     </div>
                   </div>
                 </div>
@@ -1148,9 +1152,9 @@
             >
               <h3>🔗 订阅链接</h3>
               <div class="help-text" style="margin-bottom: 12px">
-                订阅文件链接由 Cloudflare Worker
-                生成；YAML 配置链接仍来自 GitHub。Worker 不可用时会自动回退到
-                GitHub 链接。
+                订阅文件链接默认由 Cloudflare Worker 生成（仅限配置的
+                CustomNode 仓库）；切换到其他仓库、YAML
+                配置或 Worker 不可用时使用 GitHub 链接。
               </div>
               <div class="github-links-container">
                 <div
@@ -1732,6 +1736,7 @@
 
       // Cloudflare Worker 订阅管理服务：上传订阅文件后获取受保护的订阅链接
       const DEFAULT_WORKER_BASE_URL = "https://manager.knny.dpdns.org";
+      const DEFAULT_WORKER_REPO = "DaiZhouHui/CustomNode";
       const WORKER_SUBSCRIPTION_TIMEOUT = 15000;
       let workerLinkWarningShown = false;
 
@@ -1752,6 +1757,44 @@
       function isSubscriptionFile(fileName) {
         // YAML 是配置文件而不是订阅文件，继续使用 GitHub 链接
         return !/\.ya?ml$/i.test(fileName);
+      }
+
+      function getWorkerRepo() {
+        const config = window.NODE_WEB_CONFIG || {};
+        const configuredRepo =
+          typeof config.workerRepo === "string"
+            ? config.workerRepo.trim()
+            : "";
+        return configuredRepo || DEFAULT_WORKER_REPO;
+      }
+
+      function isWorkerManagedRepo(repo) {
+        return (
+          typeof repo === "string" &&
+          repo.trim().toLowerCase() === getWorkerRepo().toLowerCase()
+        );
+      }
+
+      function getSelectedLinkType() {
+        const linkTypeEl = document.getElementById("fileLinkTypeSelect");
+        const linkType = linkTypeEl ? linkTypeEl.value : "worker";
+        return ["worker", "raw", "pages"].includes(linkType)
+          ? linkType
+          : "worker";
+      }
+
+      function buildGithubLink(repo, branch, fileName, linkType) {
+        // 选择 worker 时，GitHub 链接作为回退，默认使用 Raw
+        const githubType = linkType === "pages" ? "pages" : "raw";
+        if (githubType === "pages") {
+          const parts = repo.split("/");
+          if (parts.length >= 2) {
+            const user = parts[0].toLowerCase();
+            const repoName = parts[1];
+            return `https://${user}.github.io/${repoName}/${fileName}`;
+          }
+        }
+        return `https://raw.githubusercontent.com/${repo}/${branch}/${fileName}`;
       }
 
       async function fetchWorkerSubscriptionLink(fileName, token) {
@@ -1825,12 +1868,29 @@
         token,
         fallbackUrl,
         useWorkerLink = true,
+        repo = "",
+        linkType = "worker",
       ) {
-        if (
-          !useWorkerLink ||
-          !isSubscriptionFile(fileName) ||
-          !getWorkerBaseUrl()
-        ) {
+        const workerBaseUrl = getWorkerBaseUrl();
+        const isManagedRepo = isWorkerManagedRepo(repo);
+        const canUseWorker =
+          useWorkerLink &&
+          linkType === "worker" &&
+          isSubscriptionFile(fileName) &&
+          !!workerBaseUrl;
+
+        if (canUseWorker && !isManagedRepo) {
+          console.info(
+            `当前仓库 ${repo} 不在 Worker 管理范围（${getWorkerRepo()}），使用 GitHub 链接`,
+          );
+          addLog(
+            "订阅链接",
+            `仓库 ${repo} 不在 Worker 管理范围，已使用 GitHub 链接`,
+            "info",
+          );
+        }
+
+        if (!canUseWorker || !isManagedRepo) {
           return { url: fallbackUrl, source: "github", error: null };
         }
 
@@ -1993,33 +2053,24 @@
                 `✅ ${fileName} 上传成功，新SHA: ${result.content.sha.substring(0, 8)}...`,
               );
 
-              // GitHub 回退链接：Worker 不可用时使用，依据高级配置选择链接类型（默认 GitHub Raw）
-              let githubFallbackUrl = `https://raw.githubusercontent.com/${repo}/${branch}/${fileName}`;
-              try {
-                const linkTypeEl =
-                  document.getElementById("fileLinkTypeSelect");
-                const linkType = linkTypeEl ? linkTypeEl.value : "pages";
-                if (linkType === "pages") {
-                  const parts = repo.split("/");
-                  if (parts.length >= 2) {
-                    const user = parts[0].toLowerCase();
-                    const repoName = parts[1];
-                    githubFallbackUrl = `https://${user}.github.io/${repoName}/${fileName}`;
-                  }
-                } else if (linkType === "raw") {
-                  githubFallbackUrl = `https://raw.githubusercontent.com/${repo}/${branch}/${fileName}`;
-                }
-              } catch (e) {
-                // 回退到 raw 链接
-                githubFallbackUrl = `https://raw.githubusercontent.com/${repo}/${branch}/${fileName}`;
-              }
+              // 按用户选择生成链接：
+              // worker：Worker 订阅链接（不匹配仓库/失败时回退 Raw）
+              // raw/pages：保留原有的纯 GitHub 链接方式
+              const linkType = getSelectedLinkType();
+              const githubFallbackUrl = buildGithubLink(
+                repo,
+                branch,
+                fileName,
+                linkType,
+              );
 
-              // 订阅文件优先使用 Worker 返回的受保护订阅链接
               const subscriptionLink = await resolveSubscriptionLink(
                 fileName,
                 token,
                 githubFallbackUrl,
                 useWorkerSubscriptionLink,
+                repo,
+                linkType,
               );
 
               return {
@@ -2030,6 +2081,7 @@
                 githubIoUrl: subscriptionLink.url,
                 subscriptionUrl: subscriptionLink.url,
                 subscriptionSource: subscriptionLink.source,
+                linkType: linkType,
                 githubFallbackUrl: githubFallbackUrl,
                 workerLinkError: subscriptionLink.error,
               };
