@@ -26,6 +26,23 @@
 
 修改 `config.js` 后刷新页面即可生效。页面中的输入框会自动使用这些默认值，但仍可在页面上临时修改。
 
+## 代码结构
+
+`index.html` 只保留页面结构与脚本引用，原内联脚本已按功能拆分到 `js/` 目录：
+
+- `js/theme-init.js`：页面头部主题初始化。
+- `js/app-core.js`：配置读取、全局状态、Worker 与 GitHub 上传基础逻辑。
+- `js/app-events.js`：页面事件绑定。
+- `js/app-ui.js`：主题切换、标签页、拖拽上传、Vless 直链等界面逻辑。
+- `js/app-csv.js`：CSV 列检测。
+- `js/app-generator.js`：节点生成、解析与预览。
+- `js/app-manual.js`：手动 Vless 转换工具。
+- `js/app-github.js`：远程下载、合并、上传与一键同步。
+- `js/app-clash.js`：Clash YAML 生成与 Vless URL 解析。
+- `js/app-runtime.js`：通知、日志、二维码、IP 属地与通用工具。
+
+脚本按上述顺序加载，函数与全局状态的作用范围与原单文件版本一致。
+
 ## 使用指南
 
 本工具可以从 CSV/TXT 或 IP:端口文本生成 VLESS 节点，也可以载入已有的 VLESS 直链。生成结果可在页面中复制、下载、转换成 Base64 或 YAML，并可选择与 GitHub 仓库中的订阅合并。
