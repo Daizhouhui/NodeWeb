@@ -45,7 +45,7 @@ window.NODE_WEB_CONFIG = {
     autoLocation: true, // 自动识别 IP 属地生成别名
     renameOnMerge: true, // 合并时重新设置所有节点别名
     useCsvInfo: true, // 优先使用 CSV 信息生成别名
-    aliasShowSequence: true, // 别名中显示地区序号（自选等获取不到地区的节点始终显示）
+    aliasShowSequence: false, // 别名中显示地区序号（自选等获取不到地区的节点始终显示）
     aliasShowSpeed: true // 别名中显示下载速度
   },
 
