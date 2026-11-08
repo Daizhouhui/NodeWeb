@@ -137,6 +137,9 @@
             "自选",
           autoLoc: document.getElementById("autoLocation").checked,
           useCsvInfo: document.getElementById("useCsvInfo").checked,
+          showSequence:
+            document.getElementById("aliasShowSequence").checked,
+          showSpeed: document.getElementById("aliasShowSpeed").checked,
           ipColumn: readColumnIndex("ipColumn", 0),
           portColumn: readColumnIndex("portColumn", -1),
           cityColumn: readColumnIndex("cityColumn", -1),
@@ -392,101 +395,66 @@
               }
             }
 
-            const chineseRegion = getChineseLocationName(region);
-            const chineseCity = getChineseLocationName(city) || city.trim();
-            const chineseCountry =
-              getChineseLocationName(country) || country.trim();
-
-            // 确定地区名用于分组和序号
-            let regionNameForGroup = "";
-
-            // 优先使用CSV信息（如果用户勾选了使用CSV信息）
+            // 解析CSV地名字段(城市/国家/地区码)为别名所需的首段与第二段
+            // 别名第二段统一用国家名;香港/澳门/新加坡/中国大陆城市只显示单名
+            let location = { main: "", sub: "" };
             if (config.useCsvInfo) {
-              if (chineseRegion) {
-                regionNameForGroup = chineseRegion;
-              } else if (chineseCity) {
-                regionNameForGroup = chineseCity;
-              } else if (chineseCountry) {
-                regionNameForGroup = chineseCountry;
-              }
+              location = resolveLocationAlias({ city, country, region });
             }
 
-            // 如果没有从CSV获取到地区信息，使用IP检测（IPv6和域名使用默认名称）
-            if (!regionNameForGroup) {
+            // 确定首段地名;CSV无地名信息时回退IP检测(IPv6和域名使用默认名称)
+            let isUnknownRegion = false;
+            if (!location.main) {
               const addrType = getAddressType(ip);
               if (addrType === "ipv6") {
-                regionNameForGroup = "IPv6节点";
+                location.main = "IPv6节点";
+                isUnknownRegion = true;
               } else if (addrType === "domain") {
-                regionNameForGroup = "域名节点";
+                location.main = "域名节点";
+                isUnknownRegion = true;
               } else {
                 const detectedLocation = await getLocationCached(ip);
-                regionNameForGroup =
-                  detectedLocation !== "未知"
-                    ? detectedLocation
-                    : config.prefix;
+                if (detectedLocation !== "未知") {
+                  location.main = detectedLocation;
+                } else {
+                  location.main = config.prefix;
+                  isUnknownRegion = true;
+                }
               }
             }
 
-            // 初始化地区组
-            if (!regionGroups[regionNameForGroup]) {
-              regionGroups[regionNameForGroup] = {
+            // 初始化地区组(序号按首段地名分组)
+            if (!regionGroups[location.main]) {
+              regionGroups[location.main] = {
                 nodes: [],
                 counter: 1,
               };
             }
 
             // 为当前节点生成序号
-            const sequence = regionGroups[regionNameForGroup].counter
-              .toString()
-              .padStart(2, "0");
+            const sequence = regionGroups[location.main].counter++;
 
-            // 生成别名部分数组，规则：
-            // - 如果存在城市名： 城市名+序号 - （可选速度） - 端口 - 国家名 - IP
-            // - 否则（只有国家或地区）： 国家/地区名+序号 - （可选速度） - 端口 - IP
-            const aliasParts = [];
-
-            // 1. 地区名+序号（优先城市，其次地区码/国家）
-            const hasCity = !!(chineseCity && chineseCity.trim());
-            const leadingName = hasCity
-              ? chineseCity.trim()
-              : regionNameForGroup;
-            aliasParts.push(`${leadingName}${sequence}`);
-
-            // 2. 下载速度（如果有）
-            if (speed) {
-              aliasParts.push(speed);
-            }
-
-            // 3. 端口
-            aliasParts.push(port.toString());
-
-            // 4. 如果有城市，则在端口后插入国家名（若有）
-            // 但如果国家是中国或新加坡且已有城市/地区名，则不显示国家名
-            if (hasCity && chineseCountry && chineseCountry.trim()) {
-              const shouldSkipCountry =
-                (chineseCountry === "中国" || chineseCountry === "新加坡") &&
-                (hasCity || (chineseRegion && chineseRegion.trim()));
-              if (!shouldSkipCountry) {
-                aliasParts.push(chineseCountry.trim());
-              }
-            }
-
-            // 5. IP地址（IPv6长地址会自动缩短）
-            aliasParts.push(shortenAddressForAlias(ip));
-
-            // 用"-"连接所有部分
-            const remark = aliasParts.join("-");
+            // 生成别名:地名(序号)-国家/地区-(速度)-端口-IP
+            // 序号与速度默认关闭(节点配置中可开启);获取不到地区的节点始终带序号
+            const remark = buildNodeAlias({
+              name: location.main,
+              sub: location.sub,
+              sequence: sequence,
+              showSequence: config.showSequence,
+              alwaysSequence: isUnknownRegion,
+              showSpeed: config.showSpeed,
+              speed: speed,
+              port: port,
+              address: shortenAddressForAlias(ip),
+            });
 
             // 保存节点信息
-            regionGroups[regionNameForGroup].nodes.push({
+            regionGroups[location.main].nodes.push({
               ip: ip,
               port: port,
               remark: remark,
               config: config,
             });
-
-            // 增加计数器
-            regionGroups[regionNameForGroup].counter++;
           } catch (e) {
             console.warn(`解析CSV行失败: ${line}`, e);
           }
@@ -644,13 +612,21 @@
           // 使用IP检测获取地区信息（IPv6和域名不使用数据库查询）
           const addrType = getAddressType(ip);
           let regionName;
+          let isUnknownRegion = false;
           if (addrType === "ipv6") {
             regionName = "IPv6节点";
+            isUnknownRegion = true;
           } else if (addrType === "domain") {
             regionName = "域名节点";
+            isUnknownRegion = true;
           } else {
             const location = await getLocation(ip);
-            regionName = location !== "未知" ? location : config.prefix;
+            if (location !== "未知") {
+              regionName = location;
+            } else {
+              regionName = config.prefix;
+              isUnknownRegion = true;
+            }
           }
 
           // 初始化地区组
@@ -662,12 +638,21 @@
           }
 
           // 为当前节点生成序号
-          const sequence = regionGroups[regionName].counter
-            .toString()
-            .padStart(2, "0");
+          const sequence = regionGroups[regionName].counter++;
 
-          // 生成别名：地区名序号-端口-地址
-          const remark = `${regionName}${sequence}-${finalPort}-${shortenAddressForAlias(ip)}`;
+          // 生成别名：地区名(序号)-端口-地址
+          // 序号默认关闭(节点配置中可开启);获取不到地区的节点始终带序号
+          const remark = buildNodeAlias({
+            name: regionName,
+            sub: "",
+            sequence: sequence,
+            showSequence: config.showSequence,
+            alwaysSequence: isUnknownRegion,
+            showSpeed: false,
+            speed: "",
+            port: finalPort,
+            address: shortenAddressForAlias(ip),
+          });
 
           // 保存节点信息
           regionGroups[regionName].nodes.push({

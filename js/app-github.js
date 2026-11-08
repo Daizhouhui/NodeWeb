@@ -762,13 +762,20 @@
           const regionGroups = {};
           for (const info of nodesToRename) {
             const regionName = await getLocation(info.ip);
-            const finalRegion =
-              regionName !== "未知" ? regionName : config.prefix;
+            let finalRegion;
+            let isUnknownRegion = false;
+            if (regionName !== "未知") {
+              finalRegion = regionName;
+            } else {
+              finalRegion = config.prefix;
+              isUnknownRegion = true;
+            }
 
             if (!regionGroups[finalRegion]) {
               regionGroups[finalRegion] = {
                 nodes: [],
                 counter: 1,
+                isUnknownRegion: isUnknownRegion,
               };
             }
 
@@ -784,9 +791,19 @@
           const renamedNodes = [];
           Object.keys(regionGroups).forEach((regionName) => {
             regionGroups[regionName].nodes.forEach((node) => {
-              const sequence = node.sequence.toString().padStart(2, "0");
-              // 只有IP和端口的情况，使用格式：地区名序号-端口-IP
-              const remark = `${regionName}${sequence}-${node.port}-${shortenAddressForAlias(node.ip)}`;
+              // 只有IP和端口的情况，使用格式：地区名(序号)-端口-IP
+              // 序号默认关闭(节点配置中可开启);获取不到地区的节点始终带序号
+              const remark = buildNodeAlias({
+                name: regionName,
+                sub: "",
+                sequence: node.sequence,
+                showSequence: config.showSequence,
+                alwaysSequence: regionGroups[regionName].isUnknownRegion,
+                showSpeed: false,
+                speed: "",
+                port: node.port,
+                address: shortenAddressForAlias(node.ip),
+              });
               renamedNodes.push(
                 generateLink(node.ip, node.port, node.config, remark),
               );

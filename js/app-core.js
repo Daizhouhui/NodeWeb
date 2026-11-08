@@ -280,6 +280,8 @@ function applyConfigDefaults() {
   setChecked("autoLocation", vless.autoLocation);
   setChecked("renameOnMerge", vless.renameOnMerge);
   setChecked("useCsvInfo", vless.useCsvInfo);
+  setChecked("aliasShowSequence", vless.aliasShowSequence);
+  setChecked("aliasShowSpeed", vless.aliasShowSpeed);
 
   const presets = getWebConfig().vlessPresets || {};
   fillPresetSelect("uuidPreset", presets.uuid);
