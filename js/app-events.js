@@ -295,6 +295,7 @@
             customGroup.classList.toggle("show", this.value === "custom");
             if (this.value !== "custom") {
               customInput.value = "";
+              closePathCombobox("customDownloadUrl");
             }
           });
 
@@ -309,6 +310,7 @@
             customGroup.classList.toggle("show", this.value === "custom");
             if (this.value !== "custom") {
               customInput.value = "";
+              closePathCombobox("customUploadPath");
             }
           });
 
@@ -323,6 +325,7 @@
           "customUploadPathToggle",
           "customUploadPathList",
         );
+        initRepoFilePreload();
 
         // 新增：日志控制按钮事件
         document

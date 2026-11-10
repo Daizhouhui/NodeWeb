@@ -204,6 +204,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initDragDrop();
   initEvents();
   loadSavedToken();
+  // 令牌已存在时提前加载仓库文件候选
+  preloadRepoFileLists();
   updateStats();
   addLog("系统启动", "Vless节点生成工具已启动，欢迎使用！", "info");
   initTabs();

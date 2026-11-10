@@ -21,12 +21,14 @@
           customUploadGroup.classList.toggle("show", this.value === "custom");
           if (this.value !== "custom") {
             customUploadPath.value = "";
+            closePathCombobox("customUploadPath");
           }
         });
       }
 
       // 仓库文件列表缓存：key 为 owner/repo@branch
       const repoFileListCache = new Map();
+      const repoFileListRequests = new Map();
 
       async function fetchRepoFileList() {
         const token = getGithubToken();
@@ -42,31 +44,77 @@
         if (repoFileListCache.has(cacheKey)) {
           return repoFileListCache.get(cacheKey);
         }
-
-        const url = `${getGithubApiBaseUrl()}/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
-        const response = await fetch(url, {
-          headers: {
-            Authorization: `token ${token}`,
-            Accept: getGithubApiAccept(),
-          },
-        });
-        if (!response.ok) {
-          let message = `读取仓库文件列表失败（HTTP ${response.status}）`;
-          try {
-            const err = await response.json();
-            if (err && err.message) message = err.message;
-          } catch (e) {
-            // 忽略解析失败
-          }
-          throw new Error(message);
+        if (repoFileListRequests.has(cacheKey)) {
+          return repoFileListRequests.get(cacheKey);
         }
-        const result = await response.json();
-        const paths = (result.tree || [])
-          .filter((item) => item.type === "blob" && item.path)
-          .map((item) => item.path)
-          .sort((a, b) => a.localeCompare(b));
-        repoFileListCache.set(cacheKey, paths);
-        return paths;
+
+        const request = (async () => {
+          // 只读取仓库根目录，候选名去掉扩展名
+          const url = `${getGithubApiBaseUrl()}/repos/${repo}/contents?ref=${encodeURIComponent(branch)}`;
+          const response = await fetch(url, {
+            headers: {
+              Authorization: `token ${token}`,
+              Accept: getGithubApiAccept(),
+            },
+          });
+          if (!response.ok) {
+            let message = `读取仓库文件列表失败（HTTP ${response.status}）`;
+            try {
+              const err = await response.json();
+              if (err && err.message) message = err.message;
+            } catch (e) {
+              // 忽略解析失败
+            }
+            throw new Error(message);
+          }
+          const result = await response.json();
+          const names = new Set();
+          (Array.isArray(result) ? result : []).forEach((item) => {
+            if (item.type !== "file" || !item.name) return;
+            const dotIndex = item.name.lastIndexOf(".");
+            // 点开头的隐藏文件保留原名，其余去掉扩展名
+            names.add(dotIndex > 0 ? item.name.slice(0, dotIndex) : item.name);
+          });
+          const paths = Array.from(names).sort((a, b) => a.localeCompare(b));
+          repoFileListCache.set(cacheKey, paths);
+          return paths;
+        })();
+
+        repoFileListRequests.set(cacheKey, request);
+        try {
+          return await request;
+        } finally {
+          repoFileListRequests.delete(cacheKey);
+        }
+      }
+
+      // 路径下拉控制器：用于令牌就绪时预加载、切换路径时关闭
+      const pathComboboxControllers = new Map();
+
+      function preloadRepoFileLists() {
+        if (!getGithubToken()) return;
+        pathComboboxControllers.forEach((controller) => {
+          controller.preload();
+        });
+      }
+
+      function closePathCombobox(inputId) {
+        const controller = pathComboboxControllers.get(inputId);
+        if (controller) controller.close();
+      }
+
+      function initRepoFilePreload() {
+        const tokenInput = document.getElementById("githubToken");
+        if (!tokenInput) return;
+        let preloadTimer = null;
+        const preloadIfToken = () => {
+          clearTimeout(preloadTimer);
+          if (!tokenInput.value.trim()) return;
+          // 输入令牌时防抖加载，避免每敲一个字符都请求一次
+          preloadTimer = setTimeout(preloadRepoFileLists, 600);
+        };
+        tokenInput.addEventListener("input", preloadIfToken);
+        tokenInput.addEventListener("change", preloadIfToken);
       }
 
       // 自定义路径下拉候选：点击下拉按钮读取仓库文件，输入时实时筛选
@@ -75,6 +123,9 @@
         const toggle = document.getElementById(toggleId);
         const list = document.getElementById(listId);
         if (!input || !toggle || !list) return;
+
+        // 挂到 body，使用 fixed 定位，避免撑出卡片内部滚动条
+        document.body.appendChild(list);
 
         let allPaths = [];
         let loading = false;
@@ -136,6 +187,36 @@
         };
 
         const open = () => {
+          const rect = input
+            .closest(".path-combobox")
+            .getBoundingClientRect();
+          const width = rect.width;
+          const left = Math.max(
+            8,
+            Math.min(rect.left, window.innerWidth - width - 8),
+          );
+          const spaceBelow = window.innerHeight - rect.bottom - 8;
+          const spaceAbove = rect.top - 8;
+
+          list.style.width = `${width}px`;
+          list.style.left = `${left}px`;
+          list.style.top = "auto";
+          list.style.bottom = "auto";
+
+          if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
+            list.style.top = `${rect.bottom + 6}px`;
+            list.style.maxHeight = `${Math.max(
+              80,
+              Math.min(240, spaceBelow - 6),
+            )}px`;
+          } else {
+            list.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+            list.style.maxHeight = `${Math.max(
+              80,
+              Math.min(240, spaceAbove - 6),
+            )}px`;
+          }
+
           list.classList.add("show");
           toggle.setAttribute("aria-expanded", "true");
         };
@@ -145,7 +226,17 @@
           toggle.setAttribute("aria-expanded", "false");
         };
 
-        const ensureLoaded = async () => {
+        window.addEventListener("resize", close);
+        document.addEventListener(
+          "scroll",
+          (event) => {
+            if (list.contains(event.target)) return;
+            close();
+          },
+          true,
+        );
+
+        const ensureLoaded = async (silent = false) => {
           if (loading) return;
           const repoKey = getRepoKey();
           if (repoKey !== loadedKey) {
@@ -168,12 +259,19 @@
           } catch (e) {
             loadError = e.message || String(e);
             loadedKey = repoKey;
-            showNotification("读取文件列表失败", loadError, "error");
+            if (!silent) {
+              showNotification("读取文件列表失败", loadError, "error");
+            }
           } finally {
             loading = false;
             render();
           }
         };
+
+        pathComboboxControllers.set(inputId, {
+          preload: () => ensureLoaded(true),
+          close,
+        });
 
         toggle.addEventListener("click", async (event) => {
           event.stopPropagation();
