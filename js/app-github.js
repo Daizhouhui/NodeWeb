@@ -256,6 +256,21 @@
             uploadType = "本地订阅";
             break;
 
+          case "uploadCsvNodesTxt":
+            nodeCount = data.vlessLinks.length;
+            if (nodeCount === 0) {
+              showNotification(
+                "上传失败",
+                "请先生成节点，当前没有可上传的节点数据",
+                "warning",
+              );
+              return;
+            }
+            targetPath = getGithubFileInputValue("csvNodesFile", "csvNodes");
+            uploadFunc = () => uploadCsvNodesTxt();
+            uploadType = "IP:端口文本";
+            break;
+
           case "uploadPlainNodes":
             nodeCount = data.uniqueNodes.length;
             if (nodeCount === 0) {
@@ -996,6 +1011,76 @@
           addLog("上传本地订阅", "上传失败: " + e.message, "error");
         } finally {
           showLoading(false, "uploadLocalBase64ToPathBtn");
+        }
+      }
+
+      // 上传CSV生成节点的 IP:端口#别名 文本
+      async function uploadCsvNodesTxt() {
+        showLoading(true, "uploadCsvNodesTxtBtn");
+        try {
+          if (data.vlessLinks.length === 0) {
+            showNotification(
+              "上传失败",
+              "请先生成节点，当前没有可上传的节点数据",
+              "error",
+            );
+            showLoading(false, "uploadCsvNodesTxtBtn");
+            return;
+          }
+
+          const txtContent = buildCsvNodesTxtContent();
+          if (!txtContent) {
+            showNotification(
+              "上传失败",
+              "未能从Vless链接中提取IP和端口",
+              "error",
+            );
+            showLoading(false, "uploadCsvNodesTxtBtn");
+            return;
+          }
+
+          const targetFile = getGithubFileInputValue(
+            "csvNodesFile",
+            "csvNodes",
+          );
+
+          const result = await uploadToGitHub(
+            targetFile,
+            utf8ToBase64(txtContent),
+            false,
+            `上传IP:端口文本 ${targetFile} - ${new Date().toLocaleString()} (${data.vlessLinks.length}节点)`,
+            false,
+          );
+
+          // 标记缓存需要更新
+          data.cache.needsUpdate = true;
+
+          const message = result.isNew
+            ? `✅ 新建IP:端口文本 ${targetFile} 成功！包含 ${data.vlessLinks.length} 个节点`
+            : `✅ 更新IP:端口文本 ${targetFile} 成功！包含 ${data.vlessLinks.length} 个节点`;
+
+          showNotification("上传成功", message, "success");
+          addLog(
+            "上传IP:端口文本",
+            `${message} (SHA: ${result.sha.substring(0, 8)}...)`,
+            "success",
+          );
+
+          // 显示文件链接
+          showGithubLink(
+            "csvNodesTxtLink",
+            "csvNodesTxtUrl",
+            result.githubIoUrl,
+          );
+        } catch (e) {
+          showNotification(
+            "上传失败",
+            "上传过程中发生错误: " + e.message,
+            "error",
+          );
+          addLog("上传IP:端口文本", "上传失败: " + e.message, "error");
+        } finally {
+          showLoading(false, "uploadCsvNodesTxtBtn");
         }
       }
 

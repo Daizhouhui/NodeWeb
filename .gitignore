@@ -3,3 +3,5 @@
 .vscode/
 .dsh
 test/
+.playwright-mcp/
+

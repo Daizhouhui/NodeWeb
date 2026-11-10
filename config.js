@@ -66,6 +66,7 @@ window.NODE_WEB_CONFIG = {
       optimal: "Optimal", // 优选订阅
       main: "Main", // 主要订阅
       plain: "Plain", // 明文订阅
+      csvNodes: "yx.txt", // CSV生成节点的 IP:端口#别名 文本
       yamlExtension: ".yaml" // 同名 YAML 配置的扩展名
     },
 

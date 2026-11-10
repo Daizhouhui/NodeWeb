@@ -629,6 +629,12 @@
                 <button id="downloadAllBtn" class="btn btn-success">
                   <span>📁</span> 下载明文订阅文件
                 </button>
+                <button id="downloadCsvNodesTxtBtn" class="btn btn-primary">
+                  <span>📁</span> 下载IP:端口文本
+                </button>
+                <button id="uploadCsvNodesTxtBtn" class="btn btn-info">
+                  <span>📤</span> 上传IP:端口文本
+                </button>
               </div>
             </div>
 
@@ -872,6 +878,11 @@
                     <label for="plainNodeFile">明文订阅文件</label>
                     <input type="text" id="plainNodeFile" />
                   </div>
+
+                  <div class="form-group">
+                    <label for="csvNodesFile">IP:端口文本文件</label>
+                    <input type="text" id="csvNodesFile" />
+                  </div>
                 </div>
 
                 <!-- 单独一行：删除远程文件（及其 .yaml）功能 -->
@@ -1018,6 +1029,38 @@
                         showQR(
                           document.getElementById('plainNodesUrl').value,
                           '明文订阅',
+                        )
+                      "
+                    >
+                      <span>🔍</span> 二维码
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="github-link-item"
+                  id="csvNodesTxtLink"
+                  style="display: none"
+                >
+                  <div class="link-label">IP:端口文本链接：</div>
+                  <div class="link-content">
+                    <input
+                      type="text"
+                      id="csvNodesTxtUrl"
+                      readonly
+                      class="link-input"
+                    />
+                    <button
+                      id="copyCsvNodesTxtUrl"
+                      class="btn btn-info btn-sm"
+                    >
+                      <span>📋</span> 复制
+                    </button>
+                    <button
+                      class="btn btn-primary btn-sm"
+                      onclick="
+                        showQR(
+                          document.getElementById('csvNodesTxtUrl').value,
+                          'IP:端口文本',
                         )
                       "
                     >

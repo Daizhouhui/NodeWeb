@@ -30,6 +30,7 @@ function getGithubFiles() {
     optimal: files.optimal || "Optimal",
     main: files.main || "Main",
     plain: files.plain || "Plain",
+    csvNodes: files.csvNodes || "Nodes.txt",
     yamlExtension: files.yamlExtension || ".yaml",
   };
 }
@@ -307,6 +308,7 @@ function applyConfigDefaults() {
   setValue("optimalNodeFile", getGithubFileName("optimal"));
   setValue("mainNodeFile", getGithubFileName("main"));
   setValue("plainNodeFile", getGithubFileName("plain"));
+  setValue("csvNodesFile", getGithubFileName("csvNodes"));
   populatePathSelect(
     "downloadUrlSelect",
     github.defaultDownloadPath,

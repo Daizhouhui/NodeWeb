@@ -231,6 +231,57 @@
         addLog("下载", "已下载Vless链接和订阅文件到本地", "success");
       }
 
+      // 从本地生成的Vless链接提取 IP:端口#别名 文本（CSV数据源）
+      function buildCsvNodesTxtContent() {
+        return (data.vlessLinks || [])
+          .map((link) => {
+            const match = String(link).match(
+              /^vless:\/\/[^@]+@(\[[^\]]+\]|[^:?#]+):(\d+)(?:\?[^#]*)?(?:#(.*))?$/,
+            );
+            if (!match) return "";
+            const address = match[1];
+            const port = match[2];
+            const rawAlias = match[3] || "";
+            let alias = rawAlias;
+            if (rawAlias) {
+              try {
+                alias = decodeURIComponent(rawAlias);
+              } catch (e) {
+                // 别名解码失败时保留原始内容
+              }
+            }
+            return alias
+              ? `${address}:${port}#${alias}`
+              : `${address}:${port}`;
+          })
+          .filter(Boolean)
+          .join("\n");
+      }
+
+      function downloadCsvNodesTxt() {
+        if (!data.vlessLinks.length) {
+          showNotification(
+            "下载失败",
+            "请先生成节点，当前没有可下载的数据",
+            "error",
+          );
+          return;
+        }
+        const content = buildCsvNodesTxtContent();
+        if (!content) {
+          showNotification(
+            "下载失败",
+            "未能从Vless链接中提取IP和端口",
+            "error",
+          );
+          return;
+        }
+        const fileName = getGithubFileInputValue("csvNodesFile", "csvNodes");
+        downloadBlob(content, fileName);
+        showNotification("下载成功", `已下载 ${fileName}`, "success");
+        addLog("下载文件", `IP:端口文本 ${fileName} 已下载`, "success");
+      }
+
       function downloadBlob(content, name) {
         const blob = new Blob([content], { type: "text/plain" });
         const url = URL.createObjectURL(blob);

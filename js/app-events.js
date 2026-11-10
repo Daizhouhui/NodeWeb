@@ -54,6 +54,14 @@
           .getElementById("downloadAllBtn")
           .addEventListener("click", downloadAll);
         document
+          .getElementById("downloadCsvNodesTxtBtn")
+          .addEventListener("click", downloadCsvNodesTxt);
+        document
+          .getElementById("uploadCsvNodesTxtBtn")
+          .addEventListener("click", () => {
+            validateAndUpload("uploadCsvNodesTxt");
+          });
+        document
           .getElementById("downloadSubBtn")
           .addEventListener("click", () => {
             // 清除缓存，强制重新下载
@@ -324,6 +332,9 @@
         document
           .getElementById("copyPlainNodesUrl")
           .addEventListener("click", () => copyGithubUrl("plainNodesUrl"));
+        document
+          .getElementById("copyCsvNodesTxtUrl")
+          .addEventListener("click", () => copyGithubUrl("csvNodesTxtUrl"));
         document
           .getElementById("copyMergedBase64Url")
           .addEventListener("click", () => copyGithubUrl("mergedBase64Url"));
