@@ -69,8 +69,6 @@
             if (now - lastDownloadTimestamp > DOWNLOAD_CACHE_TIME) {
               // 如果距离上次下载超过2秒，清除缓存
               data.remoteNodes = [];
-              data.nodeSha = null;
-              data.plainSha = null;
               data.optimalSha = null;
               updateStats();
             }
@@ -272,18 +270,6 @@
           .addEventListener("click", () => {
             validateAndUpload("uploadLocalBase64ToPath");
           });
-        //上传合并明文订阅按钮点击事件
-        document
-          .getElementById("uploadPlainNodesBtn")
-          .addEventListener("click", () => {
-            validateAndUpload("uploadPlainNodes");
-          });
-        //上传合并主要订阅按钮点击事件
-        document
-          .getElementById("uploadMergedBase64Btn")
-          .addEventListener("click", () => {
-            validateAndUpload("uploadMergedBase64");
-          });
         //上传合并优选订阅按钮点击事件
         document
           .getElementById("uploadMergedOptimalBtn")
@@ -302,8 +288,11 @@
         document
           .getElementById("downloadUrlSelect")
           .addEventListener("change", function () {
+            const customGroup = document.getElementById(
+              "customDownloadUrlGroup",
+            );
             const customInput = document.getElementById("customDownloadUrl");
-            customInput.classList.toggle("show", this.value === "custom");
+            customGroup.classList.toggle("show", this.value === "custom");
             if (this.value !== "custom") {
               customInput.value = "";
             }
@@ -313,12 +302,27 @@
         document
           .getElementById("uploadPathSelect")
           .addEventListener("change", function () {
+            const customGroup = document.getElementById(
+              "customUploadPathGroup",
+            );
             const customInput = document.getElementById("customUploadPath");
-            customInput.classList.toggle("show", this.value === "custom");
+            customGroup.classList.toggle("show", this.value === "custom");
             if (this.value !== "custom") {
               customInput.value = "";
             }
           });
+
+        // 初始化自定义路径下拉候选（可输入筛选）
+        initPathCombobox(
+          "customDownloadUrl",
+          "customDownloadUrlToggle",
+          "customDownloadUrlList",
+        );
+        initPathCombobox(
+          "customUploadPath",
+          "customUploadPathToggle",
+          "customUploadPathList",
+        );
 
         // 新增：日志控制按钮事件
         document
@@ -330,14 +334,8 @@
 
         // 新增：订阅链接复制按钮事件
         document
-          .getElementById("copyPlainNodesUrl")
-          .addEventListener("click", () => copyGithubUrl("plainNodesUrl"));
-        document
           .getElementById("copyCsvNodesTxtUrl")
           .addEventListener("click", () => copyGithubUrl("csvNodesTxtUrl"));
-        document
-          .getElementById("copyMergedBase64Url")
-          .addEventListener("click", () => copyGithubUrl("mergedBase64Url"));
         document
           .getElementById("copyMergedYamlUrl")
           .addEventListener("click", () => copyGithubUrl("mergedYamlUrl"));

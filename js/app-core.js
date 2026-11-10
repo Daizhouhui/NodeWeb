@@ -28,8 +28,6 @@ function getGithubFiles() {
   const files = getGithubConfig().files || {};
   return {
     optimal: files.optimal || "Optimal",
-    main: files.main || "Main",
-    plain: files.plain || "Plain",
     csvNodes: files.csvNodes || "Nodes.txt",
     yamlExtension: files.yamlExtension || ".yaml",
   };
@@ -156,8 +154,6 @@ let data = {
   remoteNodes: [],
   uniqueNodes: [],
   uploadedFiles: [], // 新增：已上传的文件列表
-  nodeSha: null,
-  plainSha: null,
   optimalSha: null, // 新增：优选订阅文件的sha
   locationSha: null, // 本地生成Base64文件的sha
   stats: { local: 0, remote: 0, merged: 0, unique: 0 },
@@ -306,19 +302,15 @@ function applyConfigDefaults() {
   setValue("githubBranch", github.branch);
   setChecked("saveToken", github.saveToken);
   setValue("optimalNodeFile", getGithubFileName("optimal"));
-  setValue("mainNodeFile", getGithubFileName("main"));
-  setValue("plainNodeFile", getGithubFileName("plain"));
   setValue("csvNodesFile", getGithubFileName("csvNodes"));
   populatePathSelect(
     "downloadUrlSelect",
     github.defaultDownloadPath,
-    ["main", "optimal", "plain"],
+    ["optimal"],
   );
-  populatePathSelect(
-    "uploadPathSelect",
-    github.defaultUploadPath,
-    ["optimal", "main", "plain"],
-  );
+  populatePathSelect("uploadPathSelect", github.defaultUploadPath, [
+    "optimal",
+  ]);
 
   const linkTypeSelect = document.getElementById("fileLinkTypeSelect");
   if (linkTypeSelect) {
@@ -360,9 +352,7 @@ function populatePathSelect(selectId, defaultKey, order) {
   const select = document.getElementById(selectId);
   if (!select) return;
   const labels = {
-    main: "主要订阅",
     optimal: "优选订阅",
-    plain: "明文订阅",
   };
   select.innerHTML = "";
   order.forEach((key) => {

@@ -1,8 +1,6 @@
       // 清除远程缓存函数
       function clearRemoteCache() {
         data.remoteNodes = [];
-        data.nodeSha = null;
-        data.plainSha = null;
         data.optimalSha = null;
         data.locationSha = null;
         displayRemoteVlessLinks();
@@ -11,109 +9,213 @@
         addLog("缓存清理", "远程节点缓存已清除", "info");
       }
 
-      // 明文订阅上传
-      async function uploadPlainNodes() {
-        showLoading(true, "uploadPlainNodesBtn");
-        try {
-          if (data.uniqueNodes.length === 0) {
-            showNotification(
-              "错误",
-              "请先合并节点，当前没有可上传的节点数据",
-              "error",
-            );
-            showLoading(false, "uploadPlainNodesBtn");
-            return;
-          }
-
-          const plainNodeFile = getGithubFileInputValue(
-            "plainNodeFile",
-            "plain",
-          );
-          const plainText = data.uniqueNodes.join("\n");
-
-          // 使用通用上传函数
-          const result = await uploadToGitHub(
-            plainNodeFile,
-            utf8ToBase64(plainText),
-            false,
-            `上传合并明文订阅到 ${plainNodeFile} - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
-          );
-
-          // 标记缓存需要更新
-          data.cache.needsUpdate = true;
-
-          const message = result.isNew
-            ? `✅ 新建明文节点文件 ${plainNodeFile} 成功！包含 ${data.uniqueNodes.length} 个节点`
-            : `✅ 更新明文节点文件 ${plainNodeFile} 成功！包含 ${data.uniqueNodes.length} 个节点`;
-
-          showNotification("上传成功", message, "success");
-          addLog(
-            "上传明文节点",
-            `${message} (SHA: ${result.sha.substring(0, 8)}...)`,
-            "success",
-          );
-
-          // 显示订阅链接
-          showGithubLink("plainNodesLink", "plainNodesUrl", result.githubIoUrl);
-
-          // 同时上传对应的YAML配置文件
-          try {
-            const yamlFileName = toYamlFileName(plainNodeFile);
-            const yamlContent = data.mergedYamlContent;
-
-            const yamlResult = await uploadToGitHub(
-              yamlFileName,
-              utf8ToBase64(yamlContent),
-              false,
-              `上传合并YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
-            );
-
-            const yamlMessage = yamlResult.isNew
-              ? `✅ 新建YAML配置文件 ${yamlFileName} 成功！`
-              : `✅ 更新YAML配置文件 ${yamlFileName} 成功！`;
-
-            showNotification("YAML上传成功", yamlMessage, "success");
-            addLog(
-              "上传YAML配置",
-              `${yamlMessage} (SHA: ${yamlResult.sha.substring(0, 8)}...)`,
-              "success",
-            );
-
-            // 显示YAML配置文件的链接（复用mergedYamlLink）
-            showGithubLink(
-              "mergedYamlLink",
-              "mergedYamlUrl",
-              yamlResult.githubIoUrl,
-            );
-          } catch (yamlError) {
-            console.warn("YAML文件上传失败，但节点文件已成功上传:", yamlError);
-            showNotification(
-              "YAML上传失败",
-              "节点文件上传成功，但YAML配置文件上传失败: " + yamlError.message,
-              "warning",
-            );
-          }
-        } catch (e) {
-          showNotification(
-            "上传失败",
-            "上传过程中发生错误: " + e.message,
-            "error",
-          );
-          addLog("上传明文节点", "上传失败: " + e.message, "error");
-        } finally {
-          showLoading(false, "uploadPlainNodesBtn");
-        }
-      }
-
       // 初始化上传路径选择
       function initUploadPathSelect() {
         const uploadPathSelect = document.getElementById("uploadPathSelect");
+        const customUploadGroup = document.getElementById(
+          "customUploadPathGroup",
+        );
         const customUploadPath = document.getElementById("customUploadPath");
 
         uploadPathSelect.addEventListener("change", function () {
-          customUploadPath.classList.toggle("show", this.value === "custom");
+          customUploadGroup.classList.toggle("show", this.value === "custom");
           if (this.value !== "custom") {
             customUploadPath.value = "";
+          }
+        });
+      }
+
+      // 仓库文件列表缓存：key 为 owner/repo@branch
+      const repoFileListCache = new Map();
+
+      async function fetchRepoFileList() {
+        const token = getGithubToken();
+        if (!token) {
+          throw new Error("请先输入GitHub Token，否则无法读取仓库文件列表");
+        }
+        const repo = getGithubRepo();
+        if (!repo) {
+          throw new Error("请先填写GitHub仓库，格式为：用户名/仓库名");
+        }
+        const branch = getGithubBranch();
+        const cacheKey = `${repo}@${branch}`;
+        if (repoFileListCache.has(cacheKey)) {
+          return repoFileListCache.get(cacheKey);
+        }
+
+        const url = `${getGithubApiBaseUrl()}/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `token ${token}`,
+            Accept: getGithubApiAccept(),
+          },
+        });
+        if (!response.ok) {
+          let message = `读取仓库文件列表失败（HTTP ${response.status}）`;
+          try {
+            const err = await response.json();
+            if (err && err.message) message = err.message;
+          } catch (e) {
+            // 忽略解析失败
+          }
+          throw new Error(message);
+        }
+        const result = await response.json();
+        const paths = (result.tree || [])
+          .filter((item) => item.type === "blob" && item.path)
+          .map((item) => item.path)
+          .sort((a, b) => a.localeCompare(b));
+        repoFileListCache.set(cacheKey, paths);
+        return paths;
+      }
+
+      // 自定义路径下拉候选：点击下拉按钮读取仓库文件，输入时实时筛选
+      function initPathCombobox(inputId, toggleId, listId) {
+        const input = document.getElementById(inputId);
+        const toggle = document.getElementById(toggleId);
+        const list = document.getElementById(listId);
+        if (!input || !toggle || !list) return;
+
+        let allPaths = [];
+        let loading = false;
+        let loadError = "";
+        let loadedKey = "";
+        let hasLoaded = false;
+
+        const getRepoKey = () => `${getGithubRepo()}@${getGithubBranch()}`;
+
+        const render = () => {
+          const keyword = input.value.trim().toLowerCase();
+          list.innerHTML = "";
+
+          if (loading) {
+            const tip = document.createElement("div");
+            tip.className = "path-combobox-empty";
+            tip.textContent = "正在读取仓库文件列表...";
+            list.appendChild(tip);
+            return;
+          }
+
+          if (loadError) {
+            const tip = document.createElement("div");
+            tip.className = "path-combobox-empty";
+            tip.textContent = loadError;
+            list.appendChild(tip);
+            return;
+          }
+
+          const matched = (
+            keyword
+              ? allPaths.filter((path) =>
+                  path.toLowerCase().includes(keyword),
+                )
+              : allPaths
+          ).slice(0, 300);
+
+          if (matched.length === 0) {
+            const tip = document.createElement("div");
+            tip.className = "path-combobox-empty";
+            tip.textContent = keyword
+              ? "没有匹配的文件，可直接输入路径"
+              : "仓库中没有可选择的文件";
+            list.appendChild(tip);
+            return;
+          }
+
+          matched.forEach((path) => {
+            const option = document.createElement("div");
+            option.className = "path-combobox-option";
+            option.textContent = path;
+            option.addEventListener("click", (event) => {
+              event.preventDefault();
+              input.value = path;
+              close();
+            });
+            list.appendChild(option);
+          });
+        };
+
+        const open = () => {
+          list.classList.add("show");
+          toggle.setAttribute("aria-expanded", "true");
+        };
+
+        const close = () => {
+          list.classList.remove("show");
+          toggle.setAttribute("aria-expanded", "false");
+        };
+
+        const ensureLoaded = async () => {
+          if (loading) return;
+          const repoKey = getRepoKey();
+          if (repoKey !== loadedKey) {
+            allPaths = [];
+            loadError = "";
+            hasLoaded = false;
+          }
+          if (hasLoaded && !loadError) {
+            loadedKey = repoKey;
+            render();
+            return;
+          }
+          loading = true;
+          loadError = "";
+          render();
+          try {
+            allPaths = await fetchRepoFileList();
+            loadedKey = repoKey;
+            hasLoaded = true;
+          } catch (e) {
+            loadError = e.message || String(e);
+            loadedKey = repoKey;
+            showNotification("读取文件列表失败", loadError, "error");
+          } finally {
+            loading = false;
+            render();
+          }
+        };
+
+        toggle.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          if (list.classList.contains("show") && !loadError) {
+            close();
+            return;
+          }
+          open();
+          if (
+            !hasLoaded ||
+            loadError ||
+            loadedKey !== getRepoKey()
+          ) {
+            await ensureLoaded();
+          } else {
+            render();
+          }
+        });
+
+        input.addEventListener("input", async () => {
+          open();
+          if (loading) return;
+          if (loadedKey !== getRepoKey() || (!hasLoaded && !loadError)) {
+            await ensureLoaded();
+          } else {
+            render();
+          }
+        });
+
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            close();
+          }
+        });
+
+        document.addEventListener("click", (event) => {
+          if (
+            !list.contains(event.target) &&
+            event.target !== toggle &&
+            event.target !== input
+          ) {
+            close();
           }
         });
       }

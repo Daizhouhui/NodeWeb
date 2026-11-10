@@ -49,7 +49,9 @@
 
 页面快捷操作区可循环切换六种主题，所选样式会保存在当前浏览器中。新浏览器的默认主题由根目录的 `config.js` 控制；将 `theme.default` 设置为 `1`（经典浅色）、`2`（经典暗夜）、`3`（澄光浅色）、`4`（澄光暗夜）、`5`（莓紫轻羽）或 `6`（莓紫夜幕）。已保存的浏览器主题优先于该默认设置。
 
-三个“上传合并”订阅按钮默认隐藏。需要显示时，在 `config.js` 中将 `ui.showMergedSubscriptionUploadButtons` 设为 `true`。默认订阅文件名在 `github.files` 中配置（`Optimal`、`Main` 和 `Plain`）。
+“上传合并优选订阅”按钮默认隐藏。需要显示时，在 `config.js` 中将 `ui.showMergedSubscriptionUploadButtons` 设为 `true`。默认优选订阅文件名在 `github.files.optimal` 中配置。
+
+下载/上传路径选择“自定义路径”后，可直接输入仓库文件路径，也可以点击下拉按钮读取仓库文件列表并按输入内容筛选。`github.files.csvNodes` 用于配置 CSV 节点 `IP:端口#别名` 文本的文件名。`一键同步远程` 会下载当前所选路径的远程订阅，按当前配置替换节点、按 `IP:端口` 去重，再以双重 Base64 上传回同一路径（仅远程节点，不与本地节点合并）。
 
 ## 1. 导入节点数据
 
@@ -124,7 +126,7 @@ ip,port,city,country,speed
 
 ### 订阅链接（Cloudflare Worker）
 
-订阅文件（Main、Optimal、Plain 以及自定义订阅路径）上传成功后，页面会携带当前 GitHub 令牌请求 Worker：
+订阅文件（Optimal 以及自定义订阅路径）上传成功后，页面会携带当前 GitHub 令牌请求 Worker：
 
 ```http
 POST https://manager.knny.dpdns.org/api/subscription-link
@@ -146,7 +148,8 @@ Worker 地址在 `config.js` 的 `github.worker.baseUrl` 中配置，管理仓�
 
 - 选择远程订阅路径，点击“下载远程订阅”载入节点。
 - 点击“合并节点”将本地节点与远程节点合并，并查看合并结果预览。
-- 检查预览和节点数量后，再选择上传合并后的主要订阅、优选订阅或明文订阅。
+- 检查预览和节点数量后，再选择上传合并后的优选订阅。
+- “一键同步远程”会下载当前所选路径的远程订阅，替换节点并去重后，上传回同一路径。
 - “上传本地订阅至指定路径”用于上传本地生成的订阅；上传路径可以使用预设文件名，也可以选择自定义路径。
 - 删除远程文件属于不可轻易撤销的操作。执行前确认仓库、分支和文件名正确。
 

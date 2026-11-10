@@ -271,36 +271,6 @@
             uploadType = "IP:端口文本";
             break;
 
-          case "uploadPlainNodes":
-            nodeCount = data.uniqueNodes.length;
-            if (nodeCount === 0) {
-              showNotification(
-                "上传失败",
-                "请先合并节点，当前没有可上传的合并节点数据",
-                "warning",
-              );
-              return;
-            }
-            targetPath = getGithubFileInputValue("plainNodeFile", "plain");
-            uploadFunc = () => uploadPlainNodes();
-            uploadType = "合并明文订阅";
-            break;
-
-          case "uploadMergedBase64":
-            nodeCount = data.uniqueNodes.length;
-            if (nodeCount === 0) {
-              showNotification(
-                "上传失败",
-                "请先合并节点，当前没有可上传的合并节点数据",
-                "warning",
-              );
-              return;
-            }
-            targetPath = getGithubFileInputValue("mainNodeFile", "main");
-            uploadFunc = () => uploadMergedBase64();
-            uploadType = "合并主要订阅";
-            break;
-
           case "uploadMergedOptimal":
             nodeCount = data.uniqueNodes.length;
             if (nodeCount === 0) {
@@ -407,14 +377,6 @@
           const targetFile = selection.file;
 
           // 根据选择的路径设置要下载的文件
-          const mainNodeFile = getGithubFileInputValue(
-            "mainNodeFile",
-            "main",
-          );
-          const plainNodeFile = getGithubFileInputValue(
-            "plainNodeFile",
-            "plain",
-          );
           const optimalNodeFile = getGithubFileInputValue(
             "optimalNodeFile",
             "optimal",
@@ -422,11 +384,7 @@
 
           let downloadFiles = [];
 
-          if (selection.key === "main") {
-            downloadFiles = [{ file: mainNodeFile, type: "base64" }];
-          } else if (selection.key === "plain") {
-            downloadFiles = [{ file: plainNodeFile, type: "plain" }];
-          } else if (selection.key === "optimal") {
+          if (selection.key === "optimal") {
             downloadFiles = [{ file: optimalNodeFile, type: "base64" }];
           } else {
             // 自定义路径，尝试下载
@@ -538,11 +496,7 @@
                 successCount++;
 
                 // 保存sha值
-                if (fileInfo.file === mainNodeFile) {
-                  data.nodeSha = fileJson.sha;
-                } else if (fileInfo.file === plainNodeFile) {
-                  data.plainSha = fileJson.sha;
-                } else if (fileInfo.file === optimalNodeFile) {
+                if (fileInfo.file === optimalNodeFile) {
                   data.optimalSha = fileJson.sha;
                 }
               } else {
@@ -922,25 +876,16 @@
             return;
           }
           const targetFile = selection.file;
-          const isPlain = selection.key === "plain";
 
-          // 根据目标路径决定上传格式
-          let contentToUpload = "";
-
-          if (isPlain) {
-            // Plain：上传明文节点
-            contentToUpload = utf8ToBase64(data.vlessLinks.join("\n"));
-          } else {
-            // Optimal、Main 和自定义路径：上传双重Base64编码
-            const firstBase64 = utf8ToBase64(data.vlessLinks.join("\n"));
-            contentToUpload = btoa(firstBase64);
-          }
+          // Optimal 和自定义路径：上传双重Base64编码
+          const firstBase64 = utf8ToBase64(data.vlessLinks.join("\n"));
+          const contentToUpload = btoa(firstBase64);
 
           // 使用通用上传函数
           const result = await uploadToGitHub(
             targetFile,
             contentToUpload,
-            !isPlain,
+            true,
             `上传本地订阅到 ${targetFile} - ${new Date().toLocaleString()} (${data.vlessLinks.length}节点)`,
           );
 
@@ -1084,105 +1029,6 @@
         }
       }
 
-      // 修复：上传合并Base64到Main
-      async function uploadMergedBase64() {
-        showLoading(true, "uploadMergedBase64Btn");
-        try {
-          if (data.uniqueNodes.length === 0) {
-            showNotification(
-              "上传失败",
-              "请先合并节点，当前没有可上传的合并节点数据",
-              "error",
-            );
-            showLoading(false, "uploadMergedBase64Btn");
-            return;
-          }
-
-          const mainNodeFile = getGithubFileInputValue("mainNodeFile", "main");
-          const plainText = data.uniqueNodes.join("\n");
-
-          // 修复：双重Base64编码（符合订阅格式）
-          const firstBase64 = utf8ToBase64(plainText);
-          const finalContent = btoa(firstBase64);
-
-          // 使用通用上传函数
-          const result = await uploadToGitHub(
-            mainNodeFile,
-            finalContent,
-            true,
-            `上传合并Base64订阅到 ${mainNodeFile} - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
-          );
-
-          // 标记缓存需要更新
-          data.cache.needsUpdate = true;
-
-          const message = result.isNew
-            ? `✅ 新建Base64订阅文件 ${mainNodeFile} 成功！包含 ${data.uniqueNodes.length} 个节点`
-            : `✅ 更新Base64订阅文件 ${mainNodeFile} 成功！包含 ${data.uniqueNodes.length} 个节点`;
-
-          showNotification("上传成功", message, "success");
-          addLog(
-            "上传合并Base64",
-            `${message} (SHA: ${result.sha.substring(0, 8)}...)`,
-            "success",
-          );
-
-          // 显示订阅链接
-          showGithubLink(
-            "mergedBase64Link",
-            "mergedBase64Url",
-            result.githubIoUrl,
-          );
-
-          // 同时上传对应的YAML配置文件
-          try {
-            const yamlFileName = toYamlFileName(mainNodeFile);
-            const yamlContent = data.mergedYamlContent;
-
-            const yamlResult = await uploadToGitHub(
-              yamlFileName,
-              utf8ToBase64(yamlContent),
-              false,
-              `上传合并YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
-            );
-
-            const yamlMessage = yamlResult.isNew
-              ? `✅ 新建YAML配置文件 ${yamlFileName} 成功！`
-              : `✅ 更新YAML配置文件 ${yamlFileName} 成功！`;
-
-            showNotification("YAML上传成功", yamlMessage, "success");
-            addLog(
-              "上传YAML配置",
-              `${yamlMessage} (SHA: ${yamlResult.sha.substring(0, 8)}...)`,
-              "success",
-            );
-
-            // 显示YAML配置文件的链接
-            showGithubLink(
-              "mergedYamlLink",
-              "mergedYamlUrl",
-              yamlResult.githubIoUrl,
-            );
-          } catch (yamlError) {
-            console.warn("YAML文件上传失败，但节点文件已成功上传:", yamlError);
-            showNotification(
-              "YAML上传失败",
-              "节点文件上传成功，但YAML配置文件上传失败: " + yamlError.message,
-              "warning",
-            );
-          }
-        } catch (e) {
-          showNotification(
-            "上传失败",
-            "上传过程中发生错误: " + e.message,
-            "error",
-          );
-          addLog("上传合并Base64", "上传失败: " + e.message, "error");
-        } finally {
-          showLoading(false, "uploadMergedBase64Btn");
-        }
-      }
-
       // 修复：上传合并订阅到Optimal
       async function uploadMergedOptimal() {
         showLoading(true, "uploadMergedOptimalBtn");
@@ -1236,7 +1082,7 @@
             result.githubIoUrl,
           );
 
-          // 同时上传对应的YAML配置文件（使用与Main相同的文件名模式）
+          // 同时上传对应的YAML配置文件（与优选订阅使用相同的文件名模式）
           try {
             const yamlFileName = toYamlFileName(optimalNodeFile);
             const yamlContent = data.mergedYamlContent;
@@ -1314,26 +1160,17 @@
             return;
           }
           const targetFile = selection.file;
-          const isPlain = selection.key === "plain";
-
           const plainText = data.uniqueNodes.join("\n");
-          let contentToUpload = "";
 
-          // 根据目标路径决定上传格式
-          if (isPlain) {
-            // Plain：上传明文节点
-            contentToUpload = utf8ToBase64(plainText);
-          } else {
-            // Optimal、Main 和自定义路径：使用双重Base64编码
-            const firstBase64 = utf8ToBase64(plainText);
-            contentToUpload = btoa(firstBase64);
-          }
+          // Optimal 和自定义路径：使用双重Base64编码
+          const firstBase64 = utf8ToBase64(plainText);
+          const contentToUpload = btoa(firstBase64);
 
           // 使用通用上传函数
           const result = await uploadToGitHub(
             targetFile,
             contentToUpload,
-            !isPlain,
+            true,
             `上传合并订阅到指定路径 ${targetFile} - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
           );
 
@@ -1407,120 +1244,85 @@
         }
       }
 
-      //一键同步(远端明文和本地明文)和(远端Base64和本地Base64)方法
+      //一键同步远程：下载所选远程订阅 → 按当前配置替换节点 → 去重 → 双重Base64上传回原路径
       async function oneClickSync() {
         showLoading(true, "syncBtn");
         try {
-          // 1. 解析本地节点
-          if (data.vlessLinks.length === 0) {
-            await generateVless();
-            if (data.vlessLinks.length === 0)
-              throw new Error("无本地节点可同步");
-          }
-
-          // 2. 从GitHub下载远程节点
-          await downloadRemote();
-
-          // 3. 合并去重
-          mergeAndShow();
-
-          // 4. 保存令牌
+          // 1. 校验令牌、仓库、路径并保存令牌
           const token = getGithubToken();
           if (!token) throw new Error("缺少GitHub Token");
+          if (!getGithubRepo()) {
+            throw new Error("请先输入GitHub仓库，格式为：用户名/仓库名");
+          }
+          const selection = resolveSelectedPathTarget(
+            "downloadUrlSelect",
+            "customDownloadUrl",
+          );
+          if (!selection.file) {
+            throw new Error("请选择或输入下载远程订阅路径");
+          }
           if (document.getElementById("saveToken").checked)
             localStorage.setItem(getGithubTokenStorageKey(), token);
 
-          // 5. 获取配置
-          const mainNodeFile = getGithubFileInputValue("mainNodeFile", "main");
-          const plainNodeFile = getGithubFileInputValue(
-            "plainNodeFile",
-            "plain",
-          );
-          const optimalNodeFile = getGithubFileInputValue(
-            "optimalNodeFile",
-            "optimal",
-          );
-          const plainText = data.uniqueNodes.join("\n");
+          // 2. 从GitHub下载远程节点
+          await downloadRemote();
+          if (data.remoteNodes.length === 0) {
+            throw new Error(`从 ${selection.file} 未下载到节点`);
+          }
 
-          // 双重Base64编码
-          const firstBase64 = utf8ToBase64(plainText);
+          // 3. 按当前配置替换生成Vless节点
+          generateRemoteVless();
+          if (data.remoteNodes.length === 0) {
+            throw new Error("替换生成远程Vless节点失败");
+          }
+
+          // 4. 按IP:端口去重
+          const seen = new Set();
+          const uniqueNodes = [];
+          data.remoteNodes.forEach((node) => {
+            const match = node.match(/@([^:]+):(\d+)/);
+            const key = match ? `${match[1]}:${match[2]}` : node;
+            if (!seen.has(key)) {
+              seen.add(key);
+              uniqueNodes.push(node);
+            }
+          });
+          data.remoteNodes = uniqueNodes;
+          data.stats.remote = uniqueNodes.length;
+          displayRemoteVlessLinks();
+          updateStats();
+
+          // 5. 双重Base64编码后上传回原路径
+          const firstBase64 = utf8ToBase64(uniqueNodes.join("\n"));
           const finalContent = btoa(firstBase64);
 
-          // 6. 上传Base64订阅文件（Main）- 双重Base64编码
-          const mainResult = await uploadToGitHub(
-            mainNodeFile,
+          await uploadToGitHub(
+            selection.file,
             finalContent,
             true,
-            `一键同步更新Main - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
+            `一键同步远程 ${selection.file} - ${new Date().toLocaleString()} (${uniqueNodes.length}节点)`,
+            false,
           );
 
-          console.log("✅ Main 上传成功");
-
-          // 7. 上传明文文件（Plain）
-          try {
-            await uploadToGitHub(
-              plainNodeFile,
-              utf8ToBase64(plainText),
-              false,
-              `一键同步明文节点到Plain - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
-            );
-            console.log("✅ Plain 上传成功");
-          } catch (e) {
-            console.warn("⚠️ Plain 上传失败，但Main已成功上传:", e);
-            // 不抛出错误，继续执行
-          }
-
-          // 8. 上传合并订阅到Optimal
-          try {
-            await uploadToGitHub(
-              optimalNodeFile,
-              finalContent,
-              true,
-              `一键同步合并订阅到Optimal - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
-            );
-            console.log("✅ Optimal 上传成功");
-          } catch (e) {
-            console.warn("⚠️ Optimal 上传失败，但其他文件已成功上传:", e);
-            // 不抛出错误，继续执行
-          }
-
-          // 9. 上传对应的YAML配置文件
-          try {
-            const yamlFileName = toYamlFileName(mainNodeFile);
-            const yamlContent = data.mergedYamlContent;
-
-            await uploadToGitHub(
-              yamlFileName,
-              utf8ToBase64(yamlContent),
-              false,
-              `一键同步YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
-            );
-            console.log("✅ YAML配置 上传成功");
-          } catch (e) {
-            console.warn("⚠️ YAML配置上传失败，但其他文件已成功上传:", e);
-            // 不抛出错误，继续执行
-          }
-
-          // 10. 清除缓存更新标记
           data.cache.needsUpdate = false;
 
           showNotification(
-            "一键同步成功",
-            `成功同步 ${data.uniqueNodes.length} 个节点到GitHub三个文件和YAML配置，所有操作已完成！`,
+            "一键同步远程成功",
+            `成功将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file}（仅远程节点，未合并本地节点）`,
             "success",
           );
           addLog(
-            "一键同步",
-            `成功同步 ${data.uniqueNodes.length} 个节点到GitHub三个文件和YAML配置`,
+            "一键同步远程",
+            `成功将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file}`,
             "success",
           );
         } catch (e) {
           showNotification(
-            "一键同步失败",
+            "一键同步远程失败",
             "同步过程中发生错误: " + e.message,
             "error",
           );
-          addLog("一键同步", "同步失败: " + e.message, "error");
+          addLog("一键同步远程", "同步失败: " + e.message, "error");
         } finally {
           showLoading(false, "syncBtn");
         }

@@ -61,18 +61,6 @@
         >
           <span>📤</span> 上传合并优选订阅
         </button>
-        <button
-          class="quick-btn merged-subscription-upload-button"
-          onclick="uploadMergedBase64()"
-        >
-          <span>📤</span> 上传合并主要订阅
-        </button>
-        <button
-          class="quick-btn merged-subscription-upload-button"
-          onclick="uploadPlainNodes()"
-        >
-          <span>📤</span> 上传合并明文订阅
-        </button>
         <button class="quick-btn" onclick="toggleLog()">
           <span>📋</span> 显示日志
         </button>
@@ -826,24 +814,59 @@
                   <div class="form-group">
                     <label for="downloadUrlSelect">下载远程订阅路径：</label>
                     <select id="downloadUrlSelect"></select>
-                    <input
-                      type="text"
-                      id="customDownloadUrl"
+                    <div
                       class="custom-url-input"
-                      placeholder="输入自定义路径，如：OtherNode"
-                    />
+                      id="customDownloadUrlGroup"
+                    >
+                      <div class="path-combobox">
+                        <input
+                          type="text"
+                          id="customDownloadUrl"
+                          placeholder="输入或选择仓库文件路径，如：OtherNode"
+                          autocomplete="off"
+                        />
+                        <button
+                          type="button"
+                          class="path-combobox-toggle"
+                          id="customDownloadUrlToggle"
+                          aria-label="选择仓库文件"
+                        >
+                          ▼
+                        </button>
+                        <div
+                          class="path-combobox-list"
+                          id="customDownloadUrlList"
+                        ></div>
+                      </div>
+                    </div>
                     <div class="help-text">选择要下载的远程订阅文件路径</div>
                   </div>
 
                   <div class="form-group">
                     <label for="uploadPathSelect">订阅待上传路径：</label>
                     <select id="uploadPathSelect"></select>
-                    <input
-                      type="text"
-                      id="customUploadPath"
-                      class="custom-url-input"
-                      placeholder="输入自定义路径，如：OtherNode"
-                    />
+                    <div class="custom-url-input" id="customUploadPathGroup">
+                      <div class="path-combobox">
+                        <input
+                          type="text"
+                          id="customUploadPath"
+                          placeholder="输入或选择仓库文件路径，如：OtherNode"
+                          autocomplete="off"
+                        />
+                        <button
+                          type="button"
+                          class="path-combobox-toggle"
+                          id="customUploadPathToggle"
+                          aria-label="选择仓库文件"
+                        >
+                          ▼
+                        </button>
+                        <div
+                          class="path-combobox-list"
+                          id="customUploadPathList"
+                        ></div>
+                      </div>
+                    </div>
                     <div class="help-text">选择订阅的待上传到远程的路径</div>
                   </div>
                 </div>
@@ -867,16 +890,6 @@
                   <div class="form-group">
                     <label for="optimalNodeFile">优选订阅文件</label>
                     <input type="text" id="optimalNodeFile" />
-                  </div>
-
-                  <div class="form-group">
-                    <label for="mainNodeFile">主要订阅文件</label>
-                    <input type="text" id="mainNodeFile" />
-                  </div>
-
-                  <div class="form-group">
-                    <label for="plainNodeFile">明文订阅文件</label>
-                    <input type="text" id="plainNodeFile" />
                   </div>
 
                   <div class="form-group">
@@ -958,7 +971,7 @@
                 </button>
               </div>
 
-              <!-- 第二行：三个按钮 -->
+              <!-- 第二行：上传合并优选订阅 -->
               <div class="github-buttons-row2">
                 <button
                   id="uploadMergedOptimalBtn"
@@ -966,21 +979,9 @@
                 >
                   <span>📤</span> 上传合并优选订阅
                 </button>
-                <button
-                  id="uploadMergedBase64Btn"
-                  class="btn btn-subscription-upload merged-subscription-upload-button"
-                >
-                  <span>📤</span> 上传合并的主要订阅
-                </button>
-                <button
-                  id="uploadPlainNodesBtn"
-                  class="btn btn-merge-upload merged-subscription-upload-button"
-                >
-                  <span>📤</span> 上传合并明文订阅
-                </button>
               </div>
 
-              <!-- 第三行：新增"上传合并订阅至指定路径"和"一键同步"按钮 -->
+              <!-- 第三行："上传合并订阅至指定路径"和"一键同步远程"按钮 -->
               <div class="github-buttons-row3">
                 <button
                   id="uploadMergedToPathBtn"
@@ -989,7 +990,7 @@
                   <span>📤</span> 上传合并订阅至指定路径
                 </button>
                 <button id="syncBtn" class="btn btn-oneclick-sync btn-block">
-                  <span>🚀</span> 一键同步（全部上传）
+                  <span>🚀</span> 一键同步远程
                 </button>
               </div>
             </div>
@@ -1007,35 +1008,6 @@
                 配置或 Worker 不可用时使用 GitHub 链接。
               </div>
               <div class="github-links-container">
-                <div
-                  class="github-link-item"
-                  id="plainNodesLink"
-                  style="display: none"
-                >
-                  <div class="link-label">明文订阅链接：</div>
-                  <div class="link-content">
-                    <input
-                      type="text"
-                      id="plainNodesUrl"
-                      readonly
-                      class="link-input"
-                    />
-                    <button id="copyPlainNodesUrl" class="btn btn-info btn-sm">
-                      <span>📋</span> 复制
-                    </button>
-                    <button
-                      class="btn btn-primary btn-sm"
-                      onclick="
-                        showQR(
-                          document.getElementById('plainNodesUrl').value,
-                          '明文订阅',
-                        )
-                      "
-                    >
-                      <span>🔍</span> 二维码
-                    </button>
-                  </div>
-                </div>
                 <div
                   class="github-link-item"
                   id="csvNodesTxtLink"
@@ -1061,38 +1033,6 @@
                         showQR(
                           document.getElementById('csvNodesTxtUrl').value,
                           'IP:端口文本',
-                        )
-                      "
-                    >
-                      <span>🔍</span> 二维码
-                    </button>
-                  </div>
-                </div>
-                <div
-                  class="github-link-item"
-                  id="mergedBase64Link"
-                  style="display: none"
-                >
-                  <div class="link-label">合并Base64订阅链接：</div>
-                  <div class="link-content">
-                    <input
-                      type="text"
-                      id="mergedBase64Url"
-                      readonly
-                      class="link-input"
-                    />
-                    <button
-                      id="copyMergedBase64Url"
-                      class="btn btn-info btn-sm"
-                    >
-                      <span>📋</span> 复制
-                    </button>
-                    <button
-                      class="btn btn-primary btn-sm"
-                      onclick="
-                        showQR(
-                          document.getElementById('mergedBase64Url').value,
-                          '合并Base64订阅',
                         )
                       "
                     >
