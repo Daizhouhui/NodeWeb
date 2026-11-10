@@ -49,7 +49,7 @@
         }
 
         const request = (async () => {
-          // 只读取仓库根目录，候选名去掉扩展名
+          // 只读取仓库根目录，仅保留不带后缀的文件名
           const url = `${getGithubApiBaseUrl()}/repos/${repo}/contents?ref=${encodeURIComponent(branch)}`;
           const response = await fetch(url, {
             headers: {
@@ -71,9 +71,9 @@
           const names = new Set();
           (Array.isArray(result) ? result : []).forEach((item) => {
             if (item.type !== "file" || !item.name) return;
-            const dotIndex = item.name.lastIndexOf(".");
-            // 点开头的隐藏文件保留原名，其余去掉扩展名
-            names.add(dotIndex > 0 ? item.name.slice(0, dotIndex) : item.name);
+            // 有后缀（含 .gitignore 这类点开头文件）一律不显示
+            if (item.name.includes(".")) return;
+            names.add(item.name);
           });
           const paths = Array.from(names).sort((a, b) => a.localeCompare(b));
           repoFileListCache.set(cacheKey, paths);
