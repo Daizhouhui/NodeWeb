@@ -340,6 +340,14 @@
           .getElementById("copyCsvNodesTxtUrl")
           .addEventListener("click", () => copyGithubUrl("csvNodesTxtUrl"));
         document
+          .getElementById("copySyncRemoteUrl")
+          .addEventListener("click", () => copyGithubUrl("syncRemoteUrl"));
+        document
+          .getElementById("copySyncRemoteYamlUrl")
+          .addEventListener("click", () =>
+            copyGithubUrl("syncRemoteYamlUrl"),
+          );
+        document
           .getElementById("copyMergedYamlUrl")
           .addEventListener("click", () => copyGithubUrl("mergedYamlUrl"));
         document

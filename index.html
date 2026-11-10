@@ -1042,6 +1042,70 @@
                 </div>
                 <div
                   class="github-link-item"
+                  id="syncRemoteLink"
+                  style="display: none"
+                >
+                  <div class="link-label">一键同步订阅链接：</div>
+                  <div class="link-content">
+                    <input
+                      type="text"
+                      id="syncRemoteUrl"
+                      readonly
+                      class="link-input"
+                    />
+                    <button
+                      id="copySyncRemoteUrl"
+                      class="btn btn-info btn-sm"
+                    >
+                      <span>📋</span> 复制
+                    </button>
+                    <button
+                      class="btn btn-primary btn-sm"
+                      onclick="
+                        showQR(
+                          document.getElementById('syncRemoteUrl').value,
+                          '一键同步订阅',
+                        )
+                      "
+                    >
+                      <span>🔍</span> 二维码
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="github-link-item"
+                  id="syncRemoteYamlLink"
+                  style="display: none"
+                >
+                  <div class="link-label">一键同步YAML链接：</div>
+                  <div class="link-content">
+                    <input
+                      type="text"
+                      id="syncRemoteYamlUrl"
+                      readonly
+                      class="link-input"
+                    />
+                    <button
+                      id="copySyncRemoteYamlUrl"
+                      class="btn btn-info btn-sm"
+                    >
+                      <span>📋</span> 复制
+                    </button>
+                    <button
+                      class="btn btn-primary btn-sm"
+                      onclick="
+                        showQR(
+                          document.getElementById('syncRemoteYamlUrl').value,
+                          '一键同步YAML',
+                        )
+                      "
+                    >
+                      <span>🔍</span> 二维码
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="github-link-item"
                   id="mergedYamlLink"
                   style="display: none"
                 >

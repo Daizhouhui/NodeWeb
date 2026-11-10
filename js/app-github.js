@@ -1293,28 +1293,78 @@
           updateStats();
 
           // 5. 双重Base64编码后上传回原路径
+          // 先隐藏上一次的链接，避免本次失败时仍显示旧链接
+          document.getElementById("syncRemoteLink").style.display = "none";
+          document.getElementById("syncRemoteYamlLink").style.display = "none";
+
           const firstBase64 = utf8ToBase64(uniqueNodes.join("\n"));
           const finalContent = btoa(firstBase64);
 
-          await uploadToGitHub(
+          const result = await uploadToGitHub(
             selection.file,
             finalContent,
             true,
             `一键同步远程 ${selection.file} - ${new Date().toLocaleString()} (${uniqueNodes.length}节点)`,
-            false,
+            true,
           );
+          showGithubLink(
+            "syncRemoteLink",
+            "syncRemoteUrl",
+            result.githubIoUrl,
+          );
+
+          // 6. 同步对应的YAML配置文件
+          let yamlSynced = false;
+          const yamlFileName = toYamlFileName(selection.file);
+          try {
+            const yamlContent = generateClashYAML(uniqueNodes);
+            const yamlResult = await uploadToGitHub(
+              yamlFileName,
+              utf8ToBase64(yamlContent),
+              false,
+              `一键同步远程YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${uniqueNodes.length}节点)`,
+              false,
+            );
+            yamlSynced = true;
+            showGithubLink(
+              "syncRemoteYamlLink",
+              "syncRemoteYamlUrl",
+              yamlResult.githubIoUrl,
+            );
+            addLog(
+              "一键同步远程",
+              `成功同步YAML配置 ${yamlFileName}`,
+              "success",
+            );
+          } catch (yamlError) {
+            console.warn("YAML文件同步失败，但订阅文件已成功上传:", yamlError);
+            showNotification(
+              "YAML同步失败",
+              "订阅文件已上传，但YAML配置同步失败: " + yamlError.message,
+              "warning",
+            );
+            addLog(
+              "一键同步远程",
+              "YAML同步失败: " + yamlError.message,
+              "error",
+            );
+          }
 
           data.cache.needsUpdate = false;
 
           showNotification(
-            "一键同步远程成功",
-            `成功将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file}（仅远程节点，未合并本地节点）`,
-            "success",
+            yamlSynced ? "一键同步远程成功" : "订阅同步成功",
+            yamlSynced
+              ? `成功将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file} 和 ${yamlFileName}（仅远程节点，未合并本地节点）`
+              : `已将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file}，但YAML配置同步失败`,
+            yamlSynced ? "success" : "warning",
           );
           addLog(
             "一键同步远程",
-            `成功将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file}`,
-            "success",
+            yamlSynced
+              ? `成功将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file} 和 ${yamlFileName}`
+              : `已将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file}，YAML同步失败`,
+            yamlSynced ? "success" : "warning",
           );
         } catch (e) {
           showNotification(
