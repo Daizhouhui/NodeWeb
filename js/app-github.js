@@ -5,6 +5,7 @@
         onConfirm,
         onCancel = null,
         type = "info",
+        options = {},
       ) {
         // 移除已存在的对话框
         const existingDialog = document.querySelector(".custom-dialog-overlay");
@@ -51,11 +52,68 @@
             </div>
         `;
 
+        // 可选：在确认框内填写文件名
+        if (options.input) {
+          const inputWrap = document.createElement("div");
+          inputWrap.className = "custom-dialog-input";
+
+          const inputLabel = document.createElement("label");
+          inputLabel.setAttribute("for", "dialogInput");
+          inputLabel.textContent = options.input.label || "文件名";
+
+          const input = document.createElement("input");
+          input.type = "text";
+          input.id = "dialogInput";
+          input.value = options.input.value || "";
+          input.placeholder = options.input.placeholder || "";
+
+          inputWrap.appendChild(inputLabel);
+          inputWrap.appendChild(input);
+
+          if (options.input.hint) {
+            const hint = document.createElement("div");
+            hint.className = "custom-dialog-input-hint";
+            hint.textContent = options.input.hint;
+            inputWrap.appendChild(hint);
+          }
+
+          dialog.insertBefore(
+            inputWrap,
+            dialog.querySelector(".custom-dialog-actions"),
+          );
+        }
+
+        // 可选：在确认框内提供复选框选项
+        if (options.checkbox) {
+          const checkboxWrap = document.createElement("label");
+          checkboxWrap.className = "custom-dialog-checkbox";
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.id = "dialogCheckbox";
+          checkbox.checked = Boolean(options.checkbox.checked);
+
+          const checkboxText = document.createElement("span");
+          checkboxText.textContent = options.checkbox.label || "";
+
+          checkboxWrap.appendChild(checkbox);
+          checkboxWrap.appendChild(checkboxText);
+
+          dialog.insertBefore(
+            checkboxWrap,
+            dialog.querySelector(".custom-dialog-actions"),
+          );
+        }
+
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
 
         // 关闭对话框函数
         const closeDialog = (action) => {
+          const inputEl = document.getElementById("dialogInput");
+          const inputValue = inputEl ? inputEl.value.trim() : undefined;
+          const checkboxEl = document.getElementById("dialogCheckbox");
+          const checked = checkboxEl ? checkboxEl.checked : undefined;
           // 移除事件监听
           if (dialogKeyHandler) {
             document.removeEventListener("keydown", dialogKeyHandler);
@@ -65,7 +123,7 @@
 
           // 执行相应的回调
           if (action === "confirm" && onConfirm) {
-            onConfirm();
+            onConfirm({ inputValue, checked });
           } else if (action === "cancel" && onCancel) {
             onCancel();
           }
@@ -114,8 +172,16 @@
 
         // 对话框获取焦点，方便键盘操作
         setTimeout(() => {
+          // 对话框可能已被快速关闭
+          if (!document.body.contains(dialog)) return;
           dialog.focus();
-          document.getElementById("dialogCancelBtn").focus(); // 默认焦点在取消按钮
+          const inputEl = document.getElementById("dialogInput");
+          if (inputEl) {
+            inputEl.focus();
+            inputEl.select();
+          } else {
+            document.getElementById("dialogCancelBtn").focus(); // 默认焦点在取消按钮
+          }
         }, 100);
       }
 
@@ -226,6 +292,8 @@
         let targetPath = "";
         let uploadFunc = null;
         let uploadType = "";
+        let dialogInput = null;
+        let dialogCheckbox = null;
 
         // 根据不同的上传函数设置参数
         switch (uploadFunction) {
@@ -267,7 +335,18 @@
               return;
             }
             targetPath = getGithubFileInputValue("csvNodesFile", "csvNodes");
-            uploadFunc = () => uploadCsvNodesTxt();
+            dialogInput = {
+              label: "本次上传文件名",
+              value: targetPath,
+              placeholder: "例如：yx.txt",
+              hint: "可直接修改；留空则使用默认文件名",
+            };
+            dialogCheckbox = {
+              label: "与 GitHub 上的同名 TXT 合并（按 IP:端口 去重）",
+              checked: false,
+            };
+            uploadFunc = ({ inputValue, checked }) =>
+              uploadCsvNodesTxt(inputValue, checked);
             uploadType = "IP:端口文本";
             break;
 
@@ -327,6 +406,9 @@
             showNotification("提示", "已取消上传操作", "info");
           },
           "info",
+          dialogInput || dialogCheckbox
+            ? { input: dialogInput, checkbox: dialogCheckbox }
+            : {},
         );
       }
 
@@ -959,8 +1041,91 @@
         }
       }
 
+      // 解析 TXT 行中的 IP:端口（用于合并去重）
+      function parseTxtNodeKey(line) {
+        const text = String(line).trim();
+        if (!text) return null;
+        let match = text.match(/^(\[[^\]]+\]):(\d+)(?:#.*)?$/);
+        if (!match) {
+          match = text.match(/^([^:#\s]+):(\d+)(?:#.*)?$/);
+        }
+        return match ? `${match[1]}:${match[2]}` : null;
+      }
+
+      // 读取 GitHub 上同名 TXT；文件不存在时返回 null
+      async function fetchGithubTxtContent(fileName) {
+        const token = getGithubToken();
+        const repo = getGithubRepo();
+        if (!token) throw new Error("缺少GitHub Token");
+        if (!repo) throw new Error("缺少GitHub仓库设置");
+        const branch = getGithubBranch();
+        const url = `${getGithubApiBaseUrl()}/repos/${repo}/contents/${fileName}?ref=${encodeURIComponent(branch)}&t=${Date.now()}`;
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `token ${token}`,
+            Accept: getGithubApiAccept(),
+          },
+        });
+        if (response.status === 404) return null;
+        if (!response.ok) {
+          let message = `读取远程文件 ${fileName} 失败（HTTP ${response.status}）`;
+          try {
+            const err = await response.json();
+            if (err && err.message) message = err.message;
+          } catch (e) {
+            // 忽略解析失败
+          }
+          throw new Error(message);
+        }
+        const result = await response.json();
+        const raw = atob(String(result.content || "").replace(/\n/g, ""));
+        try {
+          return new TextDecoder().decode(
+            Uint8Array.from(raw, (char) => char.charCodeAt(0)),
+          );
+        } catch (e) {
+          return raw;
+        }
+      }
+
+      // 本地优先，按 IP:端口 去重合并
+      function mergeTxtNodeContents(localContent, remoteContent) {
+        const seen = new Set();
+        const merged = [];
+        let localCount = 0;
+        let remoteCount = 0;
+
+        const addLine = (line) => {
+          const text = String(line).trim();
+          if (!text) return false;
+          const key = parseTxtNodeKey(text);
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          merged.push(text);
+          return true;
+        };
+
+        String(localContent || "")
+          .split(/\r?\n/)
+          .forEach((line) => {
+            if (addLine(line)) localCount++;
+          });
+        String(remoteContent || "")
+          .split(/\r?\n/)
+          .forEach((line) => {
+            if (addLine(line)) remoteCount++;
+          });
+
+        return {
+          content: merged.join("\n"),
+          localCount,
+          remoteCount,
+          total: merged.length,
+        };
+      }
+
       // 上传CSV生成节点的 IP:端口#别名 文本
-      async function uploadCsvNodesTxt() {
+      async function uploadCsvNodesTxt(fileName, mergeRemote = false) {
         showLoading(true, "uploadCsvNodesTxtBtn");
         try {
           if (data.vlessLinks.length === 0) {
@@ -973,7 +1138,7 @@
             return;
           }
 
-          const txtContent = buildCsvNodesTxtContent();
+          let txtContent = buildCsvNodesTxtContent();
           if (!txtContent) {
             showNotification(
               "上传失败",
@@ -984,16 +1149,30 @@
             return;
           }
 
-          const targetFile = getGithubFileInputValue(
-            "csvNodesFile",
-            "csvNodes",
-          );
+          const targetFile =
+            String(fileName || "").trim() ||
+            getGithubFileInputValue("csvNodesFile", "csvNodes");
+
+          // 可选择与 GitHub 上的同名 TXT 合并（本地优先，按 IP:端口 去重）
+          let mergeInfo = "";
+          if (mergeRemote) {
+            const remoteContent = await fetchGithubTxtContent(targetFile);
+            if (remoteContent === null) {
+              mergeInfo = "；远程同名文件不存在，已直接上传本地节点";
+            } else {
+              const merged = mergeTxtNodeContents(txtContent, remoteContent);
+              txtContent = merged.content;
+              mergeInfo = `；已与远程同名文件合并（本地 ${merged.localCount} 个，新增远程 ${merged.remoteCount} 个，去重后 ${merged.total} 个）`;
+            }
+          }
+
+          const nodeCount = txtContent ? txtContent.split("\n").length : 0;
 
           const result = await uploadToGitHub(
             targetFile,
             utf8ToBase64(txtContent),
             false,
-            `上传IP:端口文本 ${targetFile} - ${new Date().toLocaleString()} (${data.vlessLinks.length}节点)`,
+            `上传IP:端口文本 ${targetFile} - ${new Date().toLocaleString()} (${nodeCount}节点)`,
             false,
           );
 
@@ -1001,8 +1180,8 @@
           data.cache.needsUpdate = true;
 
           const message = result.isNew
-            ? `✅ 新建IP:端口文本 ${targetFile} 成功！包含 ${data.vlessLinks.length} 个节点`
-            : `✅ 更新IP:端口文本 ${targetFile} 成功！包含 ${data.vlessLinks.length} 个节点`;
+            ? `✅ 新建IP:端口文本 ${targetFile} 成功！包含 ${nodeCount} 个节点${mergeInfo}`
+            : `✅ 更新IP:端口文本 ${targetFile} 成功！包含 ${nodeCount} 个节点${mergeInfo}`;
 
           showNotification("上传成功", message, "success");
           addLog(

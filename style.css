@@ -2025,6 +2025,49 @@ input.not-detected {
   font-weight: 700;
 }
 
+.custom-dialog-input {
+  margin: 0 0 24px 0;
+  padding: 0 8px;
+  text-align: left;
+}
+
+.custom-dialog-input label {
+  margin-bottom: 8px;
+}
+
+.custom-dialog-input input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.custom-dialog-input-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.custom-dialog-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 8px 24px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  user-select: none;
+}
+
+.custom-dialog-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: var(--primary-color);
+  cursor: pointer;
+}
+
 .custom-dialog-actions {
   display: flex;
   gap: 16px;
