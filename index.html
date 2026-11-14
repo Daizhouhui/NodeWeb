@@ -898,8 +898,18 @@
                   </div>
                 </div>
 
+                <div class="checkbox-group">
+                  <input type="checkbox" id="uploadYamlToggle" />
+                  <label for="uploadYamlToggle">
+                    <strong>上传订阅时同时上传同名 YAML 文件</strong>
+                  </label>
+                </div>
+                <div class="help-text">
+                  关闭时只上传订阅文件；开启后同时上传同名 .yaml 配置。
+                </div>
+
                 <!-- 单独一行：删除远程文件（及其 .yaml）功能 -->
-                <div class="config-row">
+                <div class="config-row" style="margin-top: 24px">
                   <div class="form-group" style="width: 100%">
                     <label for="deleteFileName"
                       >删除远程文件及其对应yaml文件（输入文件名）</label

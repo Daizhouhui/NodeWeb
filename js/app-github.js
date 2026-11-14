@@ -992,42 +992,48 @@
             result.githubIoUrl,
           );
 
-          // 同时上传对应的YAML配置文件
-          try {
-            const yamlFileName = toYamlFileName(targetFile);
-            const yamlContent = generateClashYAML(data.vlessLinks);
+          // 同时上传对应的YAML配置文件（可在 config.js 的 github.uploadYaml 中开关）
+          if (shouldUploadYaml()) {
+            try {
+              const yamlFileName = toYamlFileName(targetFile);
+              const yamlContent = generateClashYAML(data.vlessLinks);
 
-            const yamlResult = await uploadToGitHub(
-              yamlFileName,
-              utf8ToBase64(yamlContent),
-              false,
-              `上传本地YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${data.vlessLinks.length}节点)`,
-            );
+              const yamlResult = await uploadToGitHub(
+                yamlFileName,
+                utf8ToBase64(yamlContent),
+                false,
+                `上传本地YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${data.vlessLinks.length}节点)`,
+              );
 
-            const yamlMessage = yamlResult.isNew
-              ? `✅ 新建YAML配置文件 ${yamlFileName} 成功！`
-              : `✅ 更新YAML配置文件 ${yamlFileName} 成功！`;
+              const yamlMessage = yamlResult.isNew
+                ? `✅ 新建YAML配置文件 ${yamlFileName} 成功！`
+                : `✅ 更新YAML配置文件 ${yamlFileName} 成功！`;
 
-            showNotification("YAML上传成功", yamlMessage, "success");
-            addLog(
-              "上传YAML配置",
-              `${yamlMessage} (SHA: ${yamlResult.sha.substring(0, 8)}...)`,
-              "success",
-            );
+              showNotification("YAML上传成功", yamlMessage, "success");
+              addLog(
+                "上传YAML配置",
+                `${yamlMessage} (SHA: ${yamlResult.sha.substring(0, 8)}...)`,
+                "success",
+              );
 
-            // 显示YAML配置文件的链接
-            showGithubLink(
-              "localYamlLink",
-              "localYamlUrl",
-              yamlResult.githubIoUrl,
-            );
-          } catch (yamlError) {
-            console.warn("YAML文件上传失败，但节点文件已成功上传:", yamlError);
-            showNotification(
-              "YAML上传失败",
-              "节点文件上传成功，但YAML配置文件上传失败: " + yamlError.message,
-              "warning",
-            );
+              // 显示YAML配置文件的链接
+              showGithubLink(
+                "localYamlLink",
+                "localYamlUrl",
+                yamlResult.githubIoUrl,
+              );
+            } catch (yamlError) {
+              console.warn(
+                "YAML文件上传失败，但节点文件已成功上传:",
+                yamlError,
+              );
+              showNotification(
+                "YAML上传失败",
+                "节点文件上传成功，但YAML配置文件上传失败: " +
+                  yamlError.message,
+                "warning",
+              );
+            }
           }
         } catch (e) {
           showNotification(
@@ -1262,41 +1268,47 @@
           );
 
           // 同时上传对应的YAML配置文件（与优选订阅使用相同的文件名模式）
-          try {
-            const yamlFileName = toYamlFileName(optimalNodeFile);
-            const yamlContent = data.mergedYamlContent;
+          if (shouldUploadYaml()) {
+            try {
+              const yamlFileName = toYamlFileName(optimalNodeFile);
+              const yamlContent = data.mergedYamlContent;
 
-            const yamlResult = await uploadToGitHub(
-              yamlFileName,
-              utf8ToBase64(yamlContent),
-              false,
-              `上传合并YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
-            );
+              const yamlResult = await uploadToGitHub(
+                yamlFileName,
+                utf8ToBase64(yamlContent),
+                false,
+                `上传合并YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
+              );
 
-            const yamlMessage = yamlResult.isNew
-              ? `✅ 新建YAML配置文件 ${yamlFileName} 成功！`
-              : `✅ 更新YAML配置文件 ${yamlFileName} 成功！`;
+              const yamlMessage = yamlResult.isNew
+                ? `✅ 新建YAML配置文件 ${yamlFileName} 成功！`
+                : `✅ 更新YAML配置文件 ${yamlFileName} 成功！`;
 
-            showNotification("YAML上传成功", yamlMessage, "success");
-            addLog(
-              "上传YAML配置",
-              `${yamlMessage} (SHA: ${yamlResult.sha.substring(0, 8)}...)`,
-              "success",
-            );
+              showNotification("YAML上传成功", yamlMessage, "success");
+              addLog(
+                "上传YAML配置",
+                `${yamlMessage} (SHA: ${yamlResult.sha.substring(0, 8)}...)`,
+                "success",
+              );
 
-            // 显示YAML配置文件的链接（复用mergedYamlLink）
-            showGithubLink(
-              "mergedYamlLink",
-              "mergedYamlUrl",
-              yamlResult.githubIoUrl,
-            );
-          } catch (yamlError) {
-            console.warn("YAML文件上传失败，但节点文件已成功上传:", yamlError);
-            showNotification(
-              "YAML上传失败",
-              "节点文件上传成功，但YAML配置文件上传失败: " + yamlError.message,
-              "warning",
-            );
+              // 显示YAML配置文件的链接（复用mergedYamlLink）
+              showGithubLink(
+                "mergedYamlLink",
+                "mergedYamlUrl",
+                yamlResult.githubIoUrl,
+              );
+            } catch (yamlError) {
+              console.warn(
+                "YAML文件上传失败，但节点文件已成功上传:",
+                yamlError,
+              );
+              showNotification(
+                "YAML上传失败",
+                "节点文件上传成功，但YAML配置文件上传失败: " +
+                  yamlError.message,
+                "warning",
+              );
+            }
           }
         } catch (e) {
           showNotification(
@@ -1374,42 +1386,48 @@
             result.githubIoUrl,
           );
 
-          // 同时上传对应的YAML配置文件
-          try {
-            const yamlFileName = toYamlFileName(targetFile);
-            const yamlContent = data.mergedYamlContent;
+          // 同时上传对应的YAML配置文件（可在 config.js 的 github.uploadYaml 中开关）
+          if (shouldUploadYaml()) {
+            try {
+              const yamlFileName = toYamlFileName(targetFile);
+              const yamlContent = data.mergedYamlContent;
 
-            const yamlResult = await uploadToGitHub(
-              yamlFileName,
-              utf8ToBase64(yamlContent),
-              false,
-              `上传合并YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
-            );
+              const yamlResult = await uploadToGitHub(
+                yamlFileName,
+                utf8ToBase64(yamlContent),
+                false,
+                `上传合并YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${data.uniqueNodes.length}节点)`,
+              );
 
-            const yamlMessage = yamlResult.isNew
-              ? `✅ 新建YAML配置文件 ${yamlFileName} 成功！`
-              : `✅ 更新YAML配置文件 ${yamlFileName} 成功！`;
+              const yamlMessage = yamlResult.isNew
+                ? `✅ 新建YAML配置文件 ${yamlFileName} 成功！`
+                : `✅ 更新YAML配置文件 ${yamlFileName} 成功！`;
 
-            showNotification("YAML上传成功", yamlMessage, "success");
-            addLog(
-              "上传YAML配置",
-              `${yamlMessage} (SHA: ${yamlResult.sha.substring(0, 8)}...)`,
-              "success",
-            );
+              showNotification("YAML上传成功", yamlMessage, "success");
+              addLog(
+                "上传YAML配置",
+                `${yamlMessage} (SHA: ${yamlResult.sha.substring(0, 8)}...)`,
+                "success",
+              );
 
-            // 显示YAML配置文件的链接（复用mergedYamlLink）
-            showGithubLink(
-              "mergedYamlLink",
-              "mergedYamlUrl",
-              yamlResult.githubIoUrl,
-            );
-          } catch (yamlError) {
-            console.warn("YAML文件上传失败，但节点文件已成功上传:", yamlError);
-            showNotification(
-              "YAML上传失败",
-              "节点文件上传成功，但YAML配置文件上传失败: " + yamlError.message,
-              "warning",
-            );
+              // 显示YAML配置文件的链接（复用mergedYamlLink）
+              showGithubLink(
+                "mergedYamlLink",
+                "mergedYamlUrl",
+                yamlResult.githubIoUrl,
+              );
+            } catch (yamlError) {
+              console.warn(
+                "YAML文件上传失败，但节点文件已成功上传:",
+                yamlError,
+              );
+              showNotification(
+                "YAML上传失败",
+                "节点文件上传成功，但YAML配置文件上传失败: " +
+                  yamlError.message,
+                "warning",
+              );
+            }
           }
         } catch (e) {
           showNotification(
@@ -1492,59 +1510,65 @@
             result.githubIoUrl,
           );
 
-          // 6. 同步对应的YAML配置文件
+          // 6. 同步对应的YAML配置文件（可在 config.js 的 github.uploadYaml 中开关）
+          const yamlUploadEnabled = shouldUploadYaml();
           let yamlSynced = false;
           const yamlFileName = toYamlFileName(selection.file);
-          try {
-            const yamlContent = generateClashYAML(uniqueNodes);
-            const yamlResult = await uploadToGitHub(
-              yamlFileName,
-              utf8ToBase64(yamlContent),
-              false,
-              `一键同步远程YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${uniqueNodes.length}节点)`,
-              true,
-            );
-            yamlSynced = true;
-            showGithubLink(
-              "syncRemoteYamlLink",
-              "syncRemoteYamlUrl",
-              yamlResult.githubIoUrl,
-            );
-            addLog(
-              "一键同步远程",
-              `成功同步YAML配置 ${yamlFileName}`,
-              "success",
-            );
-          } catch (yamlError) {
-            console.warn("YAML文件同步失败，但订阅文件已成功上传:", yamlError);
-            showNotification(
-              "YAML同步失败",
-              "订阅文件已上传，但YAML配置同步失败: " + yamlError.message,
-              "warning",
-            );
-            addLog(
-              "一键同步远程",
-              "YAML同步失败: " + yamlError.message,
-              "error",
-            );
+          if (yamlUploadEnabled) {
+            try {
+              const yamlContent = generateClashYAML(uniqueNodes);
+              const yamlResult = await uploadToGitHub(
+                yamlFileName,
+                utf8ToBase64(yamlContent),
+                false,
+                `一键同步远程YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${uniqueNodes.length}节点)`,
+                true,
+              );
+              yamlSynced = true;
+              showGithubLink(
+                "syncRemoteYamlLink",
+                "syncRemoteYamlUrl",
+                yamlResult.githubIoUrl,
+              );
+              addLog(
+                "一键同步远程",
+                `成功同步YAML配置 ${yamlFileName}`,
+                "success",
+              );
+            } catch (yamlError) {
+              console.warn(
+                "YAML文件同步失败，但订阅文件已成功上传:",
+                yamlError,
+              );
+              showNotification(
+                "YAML同步失败",
+                "订阅文件已上传，但YAML配置同步失败: " + yamlError.message,
+                "warning",
+              );
+              addLog(
+                "一键同步远程",
+                "YAML同步失败: " + yamlError.message,
+                "error",
+              );
+            }
           }
 
           data.cache.needsUpdate = false;
 
-          showNotification(
-            yamlSynced ? "一键同步远程成功" : "订阅同步成功",
-            yamlSynced
-              ? `成功将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file} 和 ${yamlFileName}（仅远程节点，未合并本地节点）`
-              : `已将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file}，但YAML配置同步失败`,
-            yamlSynced ? "success" : "warning",
-          );
-          addLog(
-            "一键同步远程",
-            yamlSynced
-              ? `成功将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file} 和 ${yamlFileName}`
-              : `已将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file}，YAML同步失败`,
-            yamlSynced ? "success" : "warning",
-          );
+          let syncTitle = "一键同步远程成功";
+          let syncMessage = "";
+          let syncLevel = "success";
+          if (!yamlUploadEnabled) {
+            syncMessage = `成功将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file}（YAML上传已关闭）`;
+          } else if (yamlSynced) {
+            syncMessage = `成功将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file} 和 ${yamlFileName}（仅远程节点，未合并本地节点）`;
+          } else {
+            syncTitle = "订阅同步成功";
+            syncMessage = `已将 ${uniqueNodes.length} 个远程节点同步回 ${selection.file}，但YAML配置同步失败`;
+            syncLevel = "warning";
+          }
+          showNotification(syncTitle, syncMessage, syncLevel);
+          addLog("一键同步远程", syncMessage, syncLevel);
         } catch (e) {
           showNotification(
             "一键同步远程失败",

@@ -38,6 +38,12 @@ function getGithubFileName(key) {
   return files[key] || "";
 }
 
+function shouldUploadYaml() {
+  const toggle = document.getElementById("uploadYamlToggle");
+  if (toggle) return toggle.checked;
+  return getGithubConfig().uploadYaml === true;
+}
+
 function getYamlExtension() {
   return getGithubFiles().yamlExtension || ".yaml";
 }
@@ -303,6 +309,7 @@ function applyConfigDefaults() {
   setValue("githubRepo", github.repo);
   setValue("githubBranch", github.branch);
   setChecked("saveToken", github.saveToken);
+  setChecked("uploadYamlToggle", github.uploadYaml);
   setValue("optimalNodeFile", getGithubFileName("optimal"));
   setValue("csvNodesFile", getGithubFileName("csvNodes"));
   populatePathSelect(

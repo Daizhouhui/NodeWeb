@@ -68,6 +68,9 @@ window.NODE_WEB_CONFIG = {
       yamlExtension: ".yaml" // 同名 YAML 配置的扩展名
     },
 
+    // ---- 上传行为 ----
+    uploadYaml: false, // 上传订阅时是否同时上传同名 YAML 文件（页面开关的默认值）
+
     // ---- 页面默认选项 ----
     defaultDownloadPath: "optimal", // 默认下载路径：optimal / custom
     defaultUploadPath: "optimal", // 默认上传路径：optimal / custom

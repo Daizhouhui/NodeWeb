@@ -51,7 +51,7 @@
 
 “上传合并优选订阅”按钮默认隐藏。需要显示时，在 `config.js` 中将 `ui.showMergedSubscriptionUploadButtons` 设为 `true`。默认优选订阅文件名在 `github.files.optimal` 中配置。
 
-下载/上传路径选择“自定义路径”后，可直接输入仓库文件路径，也可以点击下拉按钮读取仓库文件列表并按输入内容筛选。`github.files.csvNodes` 用于配置 CSV 节点 `IP:端口#别名` 文本的文件名。`一键同步远程` 会下载当前所选路径的远程订阅，按当前配置替换节点、按 `IP:端口` 去重，再以双重 Base64 上传回同一路径（仅远程节点，不与本地节点合并）。
+下载/上传路径选择“自定义路径”后，可直接输入仓库文件路径，也可以点击下拉按钮读取仓库文件列表并按输入内容筛选。`github.files.csvNodes` 用于配置 CSV 节点 `IP:端口#别名` 文本的文件名。`一键同步远程` 会下载当前所选路径的远程订阅，按当前配置替换节点、按 `IP:端口` 去重，再以双重 Base64 上传回同一路径（仅远程节点，不与本地节点合并）。订阅上传时默认不附带同名 YAML；如需同时上传 YAML，将 `config.js` 的 `github.uploadYaml` 设为 `true`。
 
 ## 1. 导入节点数据
 
@@ -136,7 +136,7 @@ Content-Type: application/json
 { "file": "上传的文件名" }
 ```
 
-请求成功时，页面使用响应中的 `url` 作为订阅链接。YAML 配置文件同样会请求 Worker 生成带签名的链接；手动上传 YAML 仍使用 GitHub 链接。
+请求成功时，页面使用响应中的 `url` 作为订阅链接。开启 `github.uploadYaml` 后，YAML 配置文件同样会请求 Worker 生成带签名的链接；手动上传 YAML 仍使用 GitHub 链接。
 
 “生成链接类型”默认选中 Worker（`github.defaultLinkType`）；也可以手动切换回 GitHub Raw 或 GitHub Pages，继续使用原来的链接方式。Worker 目前只管理 `config.js` 中 `github.worker.repo` 指定的仓库（默认 `DaiZhouHui/CustomNode`），切换到其他仓库时会自动改用 GitHub Raw，不会请求 Worker。
 
@@ -149,7 +149,7 @@ Worker 地址在 `config.js` 的 `github.worker.baseUrl` 中配置，管理仓�
 - 选择远程订阅路径，点击“下载远程订阅”载入节点。
 - 点击“合并节点”将本地节点与远程节点合并，并查看合并结果预览。
 - 检查预览和节点数量后，再选择上传合并后的优选订阅。
-- “一键同步远程”会下载当前所选路径的远程订阅，替换节点并去重后，上传回同一路径。
+- “一键同步远程”会下载当前所选路径的远程订阅，替换节点并去重后，上传回同一路径；同名 YAML 是否一起上传由 `github.uploadYaml` 控制（默认关闭）。
 - “上传本地订阅至指定路径”用于上传本地生成的订阅；上传路径可以使用预设文件名，也可以选择自定义路径。
 - 删除远程文件属于不可轻易撤销的操作。执行前确认仓库、分支和文件名正确。
 
