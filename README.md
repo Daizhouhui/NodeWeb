@@ -136,7 +136,7 @@ Content-Type: application/json
 { "file": "上传的文件名" }
 ```
 
-请求成功时，页面使用响应中的 `url` 作为订阅链接。YAML 配置文件不是订阅文件，仍显示 GitHub 链接（默认 Raw）。
+请求成功时，页面使用响应中的 `url` 作为订阅链接。YAML 配置文件同样会请求 Worker 生成带签名的链接；手动上传 YAML 仍使用 GitHub 链接。
 
 “生成链接类型”默认选中 Worker（`github.defaultLinkType`）；也可以手动切换回 GitHub Raw 或 GitHub Pages，继续使用原来的链接方式。Worker 目前只管理 `config.js` 中 `github.worker.repo` 指定的仓库（默认 `DaiZhouHui/CustomNode`），切换到其他仓库时会自动改用 GitHub Raw，不会请求 Worker。
 

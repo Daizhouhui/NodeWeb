@@ -1502,7 +1502,7 @@
               utf8ToBase64(yamlContent),
               false,
               `一键同步远程YAML配置 ${yamlFileName} - ${new Date().toLocaleString()} (${uniqueNodes.length}节点)`,
-              false,
+              true,
             );
             yamlSynced = true;
             showGithubLink(

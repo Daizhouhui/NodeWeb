@@ -404,14 +404,9 @@ function openNodeRepository() {
   window.location.href = url;
 }
 
-function isSubscriptionFile(fileName) {
-  // YAML 是配置文件而不是订阅文件，继续使用 GitHub 链接
-  const lowerName = String(fileName).toLowerCase();
-  const yamlExtension = getYamlExtension().toLowerCase();
-  return !(
-    (yamlExtension && lowerName.endsWith(yamlExtension)) ||
-    /\.ya?ml$/i.test(lowerName)
-  );
+function isWorkerLinkFile(fileName) {
+  // Worker 同时支持订阅文件和 YAML 配置文件生成带签名的链接
+  return Boolean(String(fileName || "").trim());
 }
 
 function getWorkerRepo() {
@@ -547,7 +542,7 @@ async function resolveSubscriptionLink(
   const canUseWorker =
     useWorkerLink &&
     linkType === "worker" &&
-    isSubscriptionFile(fileName) &&
+    isWorkerLinkFile(fileName) &&
     !!workerBaseUrl;
 
   if (canUseWorker && !isManagedRepo) {
